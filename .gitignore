@@ -1,6 +1,7 @@
 # Object and binary files
 bin/*
 src/*.o
+src/kernel/*.o
 
 # OS files
 .DS_Store
