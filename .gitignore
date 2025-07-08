@@ -1,0 +1,6 @@
+# Object and binary files
+bin/*
+src/*.o
+
+# OS files
+.DS_Store

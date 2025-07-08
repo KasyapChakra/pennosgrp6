@@ -1,0 +1,52 @@
+/* ==================================================================
+ * CIS_5480 Project 3:  PennOS
+ * Author:              
+ * Purpose:             Implement a data structure for process control block (PCB)
+ * File Name:           PCB.h
+ * File Content:        Header file for pcb struct
+ * =============================================================== */
+
+#ifndef PCB_H_
+#define PCB_H_
+
+#include <stdint.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+#include "./spthread.h"
+
+typedef enum {
+    THRD_RUNNING = 0, // running | ready
+    THRD_STOPPED = 1,
+    THRD_BLOCKED = 2, // e.g. sleeping | waiting on something    
+    THRD_ZOMBIE = 3    
+} thrd_status_t;
+
+typedef struct pcb_st {
+    spthread_t thrd;
+    thrd_status_t status; // 0 (running) | 1 (stopped) | 2 (blocked) | 3 (zombie)
+    int priority_level; // 0 (high) | 1 (mid) | 2 (low)    
+    pid_t pid;
+    pid_t pgid;
+    pid_t ppid;
+    pid_t* child_pids; // array of children pids (size = num_commands)
+    int* fds; // array of file descriptors
+    struct pcb_st* next_pcb_ptr;
+
+} pcb_t;
+
+// Function-like macros
+#define thrd_handle(pcb_ptr) ((pcb_ptr)->thrd)
+#define thrd_status(pcb_ptr) ((pcb_ptr)->status)
+#define thrd_priority(pcb_ptr) ((pcb_ptr)->priority_level)
+#define thrd_pid(pcb_ptr) ((pcb_ptr)->pid)
+#define thrd_pgid(pcb_ptr) ((pcb_ptr)->pgid)
+#define thrd_ppid(pcb_ptr) ((pcb_ptr)->ppid)
+#define thrd_next(pcb_ptr) ((pcb_ptr)->next_pcb_ptr)
+
+// Functions
+int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid);
+void pcb_destroy(pcb_t* self_ptr);
+void print_pcb_info(pcb_t* self_ptr);
+
+#endif  // PCB_H_
