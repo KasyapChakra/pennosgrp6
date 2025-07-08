@@ -5,6 +5,7 @@
  * File Name:           scheduler.c
  * File Content:        Implementation of the scheduler related functions
  * =============================================================== */
+#define _GNU_SOURCE
 
 #include "./kernel/scheduler.h"
 #include "./kernel/spthread.h"
