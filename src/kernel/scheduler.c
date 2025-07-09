@@ -79,31 +79,57 @@ void* thrd_scheduler_fn(void* arg) {
 
         for (int i = 0; i < arg_ptr->q_pick_pattern_len; i++) {  
 
-            spthread_disable_interrupts_self();          
+            // check to see if all queues are empty
+            bool all_queues_empty = true;
+            spthread_disable_interrupts_self(); // protection ON    
+            for (int j = 0; j < arg_ptr->num_queues; j++) {                
+                if (!queue_is_empty(&arg_ptr->q_array[j])) {                    
+                    all_queues_empty = false;
+                    break;
+                }                
+            }
+            spthread_enable_interrupts_self(); // protection OFF
+            // if all queues are empty ==> sigsuspend for a quantum
+            if (all_queues_empty) {
+
+                ///////////////////////// for DEBUG /////////////////////////
+                spthread_disable_interrupts_self();
+                cumulative_tick_global = (cumulative_tick_global + 1) % 10000;
+                dprintf(STDERR_FILENO, "Scheduler tick: # %d\n", cumulative_tick_global);        
+                spthread_enable_interrupts_self();
+                /////////////////////////////////////////////////////////////        
+
+                sigsuspend(&sig_set_ex_sigalrm);    
+                continue;                         
+            }
+
+            // at least one queue is not empty 
+            // ==> keep looping till find the non-empty queue at its "quantum slot"
+            spthread_disable_interrupts_self(); // protection ON         
             pcb_queue_t curr_queue = arg_ptr->q_array[arg_ptr->q_pick_pattern_array[i]];
             if (queue_is_empty(&curr_queue)) {
-                spthread_enable_interrupts_self();
+                spthread_enable_interrupts_self(); // protection OFF
                 continue;
             }
             curr_pcb_ptr = queue_head(&curr_queue);
-            spthread_enable_interrupts_self();
+            spthread_enable_interrupts_self(); // protection OFF
 
             spthread_continue(thrd_handle(curr_pcb_ptr));
             
-            ////////// for DEBUG ///////////////
+            ///////////////////////// for DEBUG /////////////////////////
             spthread_disable_interrupts_self();
             cumulative_tick_global = (cumulative_tick_global + 1) % 10000;
             dprintf(STDERR_FILENO, "Scheduler tick: # %d\n", cumulative_tick_global);        
             spthread_enable_interrupts_self();
-            /////////////////////////     
+            /////////////////////////////////////////////////////////////     
 
             sigsuspend(&sig_set_ex_sigalrm);            
             spthread_suspend(thrd_handle(curr_pcb_ptr));
 
-            spthread_disable_interrupts_self(); 
+            spthread_disable_interrupts_self(); // protection ON
             curr_pcb_ptr = pcb_queue_pop(&curr_queue);
             pcb_queue_push(&curr_queue, curr_pcb_ptr);
-            spthread_enable_interrupts_self();
+            spthread_enable_interrupts_self(); // protection OFF
 
         }
 

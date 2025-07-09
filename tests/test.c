@@ -86,14 +86,16 @@ int main(void) {
         .quantum_msec = 100,
     };    
     spthread_create(&thrd_scheduler, NULL, thrd_scheduler_fn, &new_scheduler_para);
+    
     pid_count++;
 
-
+    
     // test threads for the 3 queues
-    spthread_t temp_spthread;    
-    pcb_t* temp_pcb_ptr;   
+    pcb_t* temp_pcb_ptr; 
 
     
+    spthread_t temp_spthread;  
+
     // test thread for queue 0
     spthread_create(&temp_spthread, NULL, thrd_print_p0, NULL);
     pid_count++;
