@@ -7,11 +7,11 @@
  * =============================================================== */
 #define _GNU_SOURCE
 
-#include "./kernel/scheduler.h"
-#include "./kernel/spthread.h"
-#include "./kernel/PCB.h"
-#include "./kernel/pcb_queue.h"
-#include "./kernel/kernel_fn.h"
+#include "./scheduler.h"
+#include "./spthread.h"
+#include "./PCB.h"
+#include "./pcb_queue.h"
+#include "./kernel_fn.h"
 
 #include <signal.h>
 #include <stdbool.h>
@@ -25,10 +25,10 @@
 
 const int queue_pick_pattern[QUEUE_PICK_PATTERN_LENGTH] = {0, 1, 0, 2, 1, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 1, 0, 2};
 
-volatile sig_atomic_t cumulative_tick_global = 0; // for DEBUG, can be deleted later ////////////////
+volatile int cumulative_tick_global = 0; // for DEBUG, can be deleted later ////////////////
 
 
-void handler_sigalrm(int signum) {
+void handler_sigalrm_scheduler(int signum) {
     // the SIGALRM handler does nothing
     // the handler is for scheduler thread
 }
@@ -49,7 +49,7 @@ void* thrd_scheduler_fn(void* arg) {
     // ==> does nothing, but not block or ignore SIGALRM
     // ==> SIGALRM cannot terminate the scheduler thread
     struct sigaction sigaction_st_sigalrm = (struct sigaction){
-        .sa_handler = handler_sigalrm,
+        .sa_handler = handler_sigalrm_scheduler,
         // this mask blocks all signals except SIGALRM
         // but SIGALRM handler automatically blocks SIGALRM during handler execution
         // so essentially this mask blocks everything during handler execution
@@ -58,11 +58,17 @@ void* thrd_scheduler_fn(void* arg) {
     };      
     sigaction(SIGALRM, &sigaction_st_sigalrm, NULL);
 
-    // make sure SIGALRM is unblocked for scheduler thread
-    sigset_t sig_set_only_sigalrm;
-    sigemptyset(&sig_set_only_sigalrm);
-    sigaddset(&sig_set_only_sigalrm, SIGALRM);
-    pthread_sigmask(SIG_UNBLOCK, &sig_set_only_sigalrm, NULL);
+    // block SIGINT and SIGTSTP for scheduler thread
+    sigset_t sig_set_scheduler;
+    sigemptyset(&sig_set_scheduler);
+    sigaddset(&sig_set_scheduler, SIGINT);
+    sigaddset(&sig_set_scheduler, SIGTSTP);
+    pthread_sigmask(SIG_BLOCK, &sig_set_scheduler, NULL); 
+
+    // unblock SIGALRM for scheduler thread    
+    sigemptyset(&sig_set_scheduler);
+    sigaddset(&sig_set_scheduler, SIGALRM);
+    pthread_sigmask(SIG_UNBLOCK, &sig_set_scheduler, NULL);
 
     // set and start timer (interval = 100 ms)
     struct itimerval scheduler_itimer;
@@ -72,12 +78,15 @@ void* thrd_scheduler_fn(void* arg) {
     };
     scheduler_itimer.it_value = scheduler_itimer.it_interval;
     setitimer(ITIMER_REAL, &scheduler_itimer, NULL);    
-    
 
     pcb_t* curr_pcb_ptr;
-    while (true) {
+    while (!pennos_done) {
 
         for (int i = 0; i < arg_ptr->q_pick_pattern_len; i++) {  
+
+            if (pennos_done) {
+                break;
+            }
 
             // check to see if all queues are empty
             bool all_queues_empty = true;
@@ -89,13 +98,13 @@ void* thrd_scheduler_fn(void* arg) {
                 }                
             }
             spthread_enable_interrupts_self(); // protection OFF
-            // if all queues are empty ==> sigsuspend for a quantum
+            // if all queues are empty ==> sigsuspend for a quantum            
             if (all_queues_empty) {
 
                 ///////////////////////// for DEBUG /////////////////////////
                 spthread_disable_interrupts_self();
                 cumulative_tick_global = (cumulative_tick_global + 1) % 10000;
-                dprintf(STDERR_FILENO, "Scheduler tick: # %d\n", cumulative_tick_global);        
+                dprintf(STDERR_FILENO, "Scheduler tick on empty queues: # %d\n", cumulative_tick_global);        
                 spthread_enable_interrupts_self();
                 /////////////////////////////////////////////////////////////        
 
@@ -106,12 +115,12 @@ void* thrd_scheduler_fn(void* arg) {
             // at least one queue is not empty 
             // ==> keep looping till find the non-empty queue at its "quantum slot"
             spthread_disable_interrupts_self(); // protection ON         
-            pcb_queue_t curr_queue = arg_ptr->q_array[arg_ptr->q_pick_pattern_array[i]];
-            if (queue_is_empty(&curr_queue)) {
+            pcb_queue_t* curr_queue_ptr = &arg_ptr->q_array[arg_ptr->q_pick_pattern_array[i]];
+            if (queue_is_empty(curr_queue_ptr)) {
                 spthread_enable_interrupts_self(); // protection OFF
                 continue;
             }
-            curr_pcb_ptr = queue_head(&curr_queue);
+            curr_pcb_ptr = queue_head(curr_queue_ptr);
             spthread_enable_interrupts_self(); // protection OFF
 
             spthread_continue(thrd_handle(curr_pcb_ptr));
@@ -127,13 +136,15 @@ void* thrd_scheduler_fn(void* arg) {
             spthread_suspend(thrd_handle(curr_pcb_ptr));
 
             spthread_disable_interrupts_self(); // protection ON
-            curr_pcb_ptr = pcb_queue_pop(&curr_queue);
-            pcb_queue_push(&curr_queue, curr_pcb_ptr);
+            curr_pcb_ptr = pcb_queue_pop(curr_queue_ptr);
+            pcb_queue_push(curr_queue_ptr, curr_pcb_ptr);
             spthread_enable_interrupts_self(); // protection OFF
 
         }
 
     }    
+
+    dprintf(STDERR_FILENO, "########### Scheduler exit ###########\n");
 
     spthread_exit(NULL);
     return NULL;   

@@ -2,6 +2,7 @@
 bin/*
 src/*.o
 src/kernel/*.o
+src/shell/*.o
 
 # OS files
 .DS_Store

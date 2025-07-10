@@ -35,7 +35,8 @@ typedef struct pcb_st {
 
 } pcb_t;
 
-// Function-like macros
+
+// ========================= Functions-like macros ========================= //
 #define thrd_handle(pcb_ptr) ((pcb_ptr)->thrd)
 #define thrd_status(pcb_ptr) ((pcb_ptr)->status)
 #define thrd_priority(pcb_ptr) ((pcb_ptr)->priority_level)
@@ -44,7 +45,7 @@ typedef struct pcb_st {
 #define thrd_ppid(pcb_ptr) ((pcb_ptr)->ppid)
 #define thrd_next(pcb_ptr) ((pcb_ptr)->next_pcb_ptr)
 
-// Functions
+// ============================ Functions ============================ //
 int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid);
 void pcb_destroy(pcb_t* self_ptr);
 void print_pcb_info(pcb_t* self_ptr);

@@ -21,9 +21,9 @@
 #include "./kernel/scheduler.h"
 
 
-volatile sig_atomic_t count_p0 = 0;
-volatile sig_atomic_t count_p1 = 0;
-volatile sig_atomic_t count_p2 = 0;
+volatile int count_p0 = 0;
+volatile int count_p1 = 0;
+volatile int count_p2 = 0;
 
 
 #define BUF_SIZE 4096

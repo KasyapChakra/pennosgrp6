@@ -33,14 +33,14 @@ typedef struct pcb_queue_st {
     data_destroy_fn_ptr data_destroy_fn;
 } pcb_queue_t;
 
-// Function-like macros
+// ========================= Functions-like macros ========================= //
 #define queue_len(pcb_queue_ptr) ((pcb_queue_ptr)->length)
 #define queue_is_empty(pcb_queue_ptr) ((pcb_queue_ptr)->length == 0)
 #define queue_type(pcb_queue_ptr) ((pcb_queue_ptr)->q_type)
 #define queue_head(pcb_queue_ptr) ((pcb_queue_ptr)->q_head_ptr)
 #define queue_end(pcb_queue_ptr) ((pcb_queue_ptr)->q_end_ptr)
 
-// Functions
+// ============================ Functions ============================ //
 pcb_queue_t pcb_queue_init(queue_type_t queue_type_code);
 pcb_t* pcb_queue_pop(pcb_queue_t* self);
 pcb_t* pcb_queue_pop_by_pid(pcb_queue_t* self, pid_t target_pid);
