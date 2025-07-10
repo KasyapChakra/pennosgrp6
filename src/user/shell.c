@@ -2,7 +2,7 @@
 
 #include "shell.h"
 #include <signal.h>
-//needs to include signal files for current error and jobnfiles
+#include "../common/pennos_signal.h"
 #include "../util/parser.h"
 #include "../util/utils.h"
 #include "jobs.h"
