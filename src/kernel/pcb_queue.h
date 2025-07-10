@@ -41,11 +41,52 @@ typedef struct pcb_queue_st {
 #define queue_end(pcb_queue_ptr) ((pcb_queue_ptr)->q_end_ptr)
 
 // ============================ Functions ============================ //
+/**
+* This function initializes a PCB queue with the specified queue type.
+* 
+* @param queue_type_code The type of the queue to be initialized.
+* @return A pcb_queue_t structure representing the initialized queue.
+*/
 pcb_queue_t pcb_queue_init(queue_type_t queue_type_code);
+
+/**
+* This function pops a PCB from the front of the queue.
+* 
+* @param self Pointer to the PCB queue.
+* @return Pointer to the popped PCB, or NULL if the queue is empty.
+*/
 pcb_t* pcb_queue_pop(pcb_queue_t* self);
+
+/**
+* This function pops a PCB from the queue by its PID.
+* 
+* @param self Pointer to the PCB queue.
+* @param target_pid The PID of the PCB to be popped.
+* @return Pointer to the popped PCB, or NULL if the PCB with the specified PID is not found.
+*/
 pcb_t* pcb_queue_pop_by_pid(pcb_queue_t* self, pid_t target_pid);
+
+/** 
+* This function pushes a PCB to the end of the queue.
+* 
+* @param self Pointer to the PCB queue.
+* @param pcb_ptr Pointer to the PCB to be pushed onto the queue.
+*/
 void pcb_queue_push(pcb_queue_t* self, pcb_t* pcb_ptr);
+
+/** 
+* This function destroys the PCB queue and frees its resources.
+* 
+* @param self Pointer to the PCB queue to be destroyed.
+*/
 void pcb_queue_destroy(pcb_queue_t* self);
+
+/**
+* This function prints the information of the PCB queue.
+* It prints the queue type, length, and the information of each PCB in the queue.
+* 
+* @param self_ptr Pointer to the PCB queue to be printed.
+*/
 void print_queue_info(pcb_queue_t* self_ptr);
 
 #endif  // QUEUE_H_

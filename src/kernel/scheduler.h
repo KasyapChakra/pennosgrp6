@@ -28,7 +28,21 @@ typedef struct scheduler_para_st {
 
 
 // ============================ Functions ============================ //
+/**
+ * This function handles the SIGALRM signal for the scheduler thread.
+ * It does nothing but is used to prevent the scheduler thread from being terminated by SIGALRM.
+ *
+ * @param signum The signal number (not used).
+ */
 void handler_sigalrm_scheduler(int signum);
+
+/**
+ * This function is the main function for the scheduler thread.
+ * It implements the scheduling algorithm based on the provided parameters.
+ *
+ * @param arg Pointer to a scheduler_para_t structure containing scheduling parameters.
+ * @return NULL (the return value is not used).
+ */
 void* thrd_scheduler_fn([[maybe_unused]] void* arg);
 
 

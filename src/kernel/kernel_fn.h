@@ -27,8 +27,26 @@ extern pcb_queue_t priority_queue_array[NUM_PRIORITY_QUEUES];
 
 
 // ============================ Functions ============================ //
+/**
+* This function cancels the thread associated with the PCB and waits for it to finish.
+* It is used to clean up the PCB when it is no longer needed.
+* 
+* @param pcb_ptr Pointer to the PCB to be cancelled and joined.
+*/
 void cancel_and_join_pcb(pcb_t* pcb_ptr);
+
+/**
+* This function cancels the thread and waits for it to finish.
+* It is used to clean up the thread when it is no longer needed.
+*
+* @param thread The thread to be cancelled and joined.
+*/
 void cancel_and_join_thrd(spthread_t thread);
+
+/**
+* This function initializes the PennOS kernel.
+* It sets up the necessary data structures and starts the scheduler thread.
+*/
 void pennos_init();
 
 

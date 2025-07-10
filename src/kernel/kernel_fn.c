@@ -5,6 +5,7 @@
  * File Name:           kernel_fn.c
  * File Content:        Implementation of kernel related functions
  * =============================================================== */
+ #define _GNU_SOURCE
 
 #include "./kernel_fn.h"
 #include "./spthread.h"

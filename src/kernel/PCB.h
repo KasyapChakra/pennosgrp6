@@ -46,8 +46,29 @@ typedef struct pcb_st {
 #define thrd_next(pcb_ptr) ((pcb_ptr)->next_pcb_ptr)
 
 // ============================ Functions ============================ //
+/** 
+ * This function initializes a PCB with the given thread, priority code, and pid.
+ * 
+ * @param thread The thread to be associated with the PCB.
+ * @param result_pcb Pointer to a pointer where the initialized PCB will be stored.
+ * @param priority_code The priority level of the PCB (0, 1, or 2).
+ * @param pid The process ID for the PCB.
+ */
 int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid);
+
+/**
+ * This function destroys a PCB, freeing its resources when it is no longer needed.
+ * 
+ * @param self_ptr Pointer to the PCB to be destroyed.
+ */
 void pcb_destroy(pcb_t* self_ptr);
+
+/**
+ * This function prints the information of a PCB to STDERR.
+ * It is useful for debugging and understanding the state of the PCB.
+ * 
+ * @param self_ptr Pointer to the PCB whose information will be printed.
+ */
 void print_pcb_info(pcb_t* self_ptr);
 
 #endif  // PCB_H_

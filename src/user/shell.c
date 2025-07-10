@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include "shell.h"
 #include <signal.h>
 //needs to include signal files for current error and jobnfiles
