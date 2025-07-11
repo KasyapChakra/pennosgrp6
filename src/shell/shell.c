@@ -7,6 +7,8 @@
  * =============================================================== */
 
 #include "./shell.h"
+#include "builtins.h"
+#include "../user/syscall_kernel.h"
 #include "../kernel/kernel_fn.h"
 
 #include <signal.h>
@@ -14,8 +16,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
+#include <stddef.h>
 
-
+/* forward decl for builtins defined in user/shell.c to avoid implicit decl */
+extern void* zombify(void*);
+extern void* orphanify(void*);
 
 void write_prompt(char* prompt_input) {
   ssize_t num_bytes_write;
@@ -183,9 +189,27 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
             continue;
         }   
 
-        // non-empty command ==> parse and execute
-        // To-Do  
-        // ...
+        // simple parsing: first token by whitespace
+        char* saveptr;
+        char* tok = strtok_r(cmd_string, " \t\n", &saveptr);
+        if (!tok) continue;
+
+        if (strcmp(tok, "ps") == 0) {
+            s_spawn(ps_builtin, NULL, -1, -1);
+        } else if (strcmp(tok, "busy") == 0) {
+            s_spawn(busy_builtin, NULL, -1, -1);
+        } else if (strcmp(tok, "zombify") == 0) {
+            s_spawn(zombify, NULL, -1, -1);
+        } else if (strcmp(tok, "orphanify") == 0) {
+            s_spawn(orphanify, NULL, -1, -1);
+        } else {
+            dprintf(STDERR_FILENO, "unknown command: %s\n", tok);
+        }
+
+        // wait on any finished children before next prompt
+        while (s_waitpid(-1, NULL, true) > 0) {
+            ;
+        }
 
     }// end of shell-loop
 

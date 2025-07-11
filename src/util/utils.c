@@ -3,6 +3,9 @@
 #include "utils.h"
 #include "panic.h"
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include "parser.h"
 
 void assert_non_null(const void* const ptr, const char* description) {
   if (ptr) {
