@@ -202,10 +202,18 @@ int k_nice(pid_t pid, int priority) {
 }
 
 void k_printprocess(void) {
-    dprintf(STDERR_FILENO, "===== process list =====\n");
+    dprintf(STDERR_FILENO, "PID PPID PRI STAT CMD\n");
     pcb_t* curr = g_pcb_list_head;
     while (curr) {
-        dprintf(STDERR_FILENO, "pid %d | ppid %d | prio %d | status %d\n", thrd_pid(curr), thrd_ppid(curr), thrd_priority(curr), thrd_status(curr));
+        // turn the status enum into a string
+        const char* status_str;
+        switch (thrd_status(curr)) {
+            case THRD_RUNNING: status_str = "R"; break;
+            case THRD_STOPPED: status_str = "S"; break;
+            case THRD_BLOCKED: status_str = "B"; break;
+            case THRD_ZOMBIE:  status_str = "Z"; break;
+        }
+        dprintf(STDERR_FILENO, "    %d   %d   %d   %s   %s\n", thrd_pid(curr), thrd_ppid(curr), thrd_priority(curr), status_str, thrd_CMD(curr));
         curr = thrd_next(curr);
     }
 }

@@ -128,10 +128,10 @@ void* thrd_scheduler_fn(void* arg) {
             klog("[%5d]\tSCHEDULE\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(curr_pcb_ptr), queue_type(curr_queue_ptr));
             
             ///////////////////////// for DEBUG /////////////////////////
-            spthread_disable_interrupts_self();
-            cumulative_tick_global = (cumulative_tick_global + 1) % 10000;
-            dprintf(STDERR_FILENO, "Scheduler tick: # %d\n", cumulative_tick_global);        
-            spthread_enable_interrupts_self();
+            // spthread_disable_interrupts_self();
+            // cumulative_tick_global = (cumulative_tick_global + 1) % 10000;
+            // dprintf(STDERR_FILENO, "Scheduler tick: # %d\n", cumulative_tick_global);        
+            // spthread_enable_interrupts_self();
             /////////////////////////////////////////////////////////////     
 
             sigsuspend(&sig_set_ex_sigalrm);            

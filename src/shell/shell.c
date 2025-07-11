@@ -5,8 +5,10 @@
  * File Name:           shell.c
  * File Content:        Implementation of the shell related functions
  * =============================================================== */
+#define _GNU_SOURCE
 
 #include "./shell.h"
+#include "../user/shell.h"
 #include "builtins.h"
 #include "../user/syscall_kernel.h"
 #include "../kernel/kernel_fn.h"
@@ -169,6 +171,10 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
     pthread_sigmask(SIG_UNBLOCK, &sig_set_shell, NULL);
 
     dprintf(STDERR_FILENO, "########### Shell thread started ###########\n");
+
+    // // Call the main shell function from user/shell.c
+    // shell_main(NULL);
+
     while (true) {
         write_prompt(PROMPT);
 

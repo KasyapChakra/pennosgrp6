@@ -32,6 +32,7 @@ typedef struct pcb_st {
     pid_t* child_pids; // array of children pids (size = num_commands)
     int* fds; // array of file descriptors
     struct pcb_st* next_pcb_ptr;
+    char* command; // command string associated with this PCB
 
 } pcb_t;
 
@@ -44,6 +45,7 @@ typedef struct pcb_st {
 #define thrd_pgid(pcb_ptr) ((pcb_ptr)->pgid)
 #define thrd_ppid(pcb_ptr) ((pcb_ptr)->ppid)
 #define thrd_next(pcb_ptr) ((pcb_ptr)->next_pcb_ptr)
+#define thrd_CMD(pcb_ptr) ((pcb_ptr)->command)
 
 // ============================ Functions ============================ //
 /** 
@@ -54,7 +56,8 @@ typedef struct pcb_st {
  * @param priority_code The priority level of the PCB (0, 1, or 2).
  * @param pid The process ID for the PCB.
  */
-int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid);
+int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid, 
+             char* command);
 
 /**
  * This function destroys a PCB, freeing its resources when it is no longer needed.
