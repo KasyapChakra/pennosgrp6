@@ -31,6 +31,8 @@ TEST_EXECS = $(subst $(TESTS_DIR),$(BIN_DIR),$(TEST_MAINS:.c=))
 
 # srcs = all C files in SRC_DIR that are not listed in MAIN_FILES
 SRCS = $(filter-out $(MAIN_FILES), $(shell find $(SRC_DIR) -type f -name '*.c'))
+# exclude duplicate util spthread implementation
+SRCS := $(filter-out $(SRC_DIR)/util/spthread.c, $(SRCS))
 HDRS = $(shell find src -type f -name '*.h')
 OBJS = $(SRCS:.c=.o)
 

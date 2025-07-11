@@ -1,0 +1,61 @@
+Script started on 2025-07-10 22:54:32-04:00 [TERM="xterm-256color" TTY="/dev/pts/5" COLUMNS="108" LINES="1"]
+Scheduler tick on empty queues: # 1
+============ Print Queue info ============
+Queue Type: 0
+Queue Length: 2
+~~~~~~ Now print each PCB info ~~~~~~
+	------ Print PCB info ------
+	Thread Status: 1
+	Thread Priority Level: 0
+	Thread PID: 3
+	Thread PGID: 0
+	Thread parent PID: 0
+
+	------ Print PCB info ------
+	Thread Status: 1
+	Thread Priority Level: 0
+	Thread PID: 4
+	Thread PGID: 0
+	Thread parent PID: 0
+
+============ Print Queue info ============
+Queue Type: 1
+Queue Length: 1
+~~~~~~ Now print each PCB info ~~~~~~
+	------ Print PCB info ------
+	Thread Status: 1
+	Thread Priority Level: 1
+	Thread PID: 5
+	Thread PGID: 0
+	Thread parent PID: 0
+
+============ Print Queue info ============
+Queue Type: 2
+Queue Length: 1
+~~~~~~ Now print each PCB info ~~~~~~
+	------ Print PCB info ------
+	Thread Status: 1
+	Thread Priority Level: 2
+	Thread PID: 6
+	Thread PGID: 0
+	Thread parent PID: 0
+
+Scheduler tick: # 2
+########### Shell thread started ###########
+$ $ 
+########### Shell thread ended ###########
+Scheduler tick: # 3
+########### Scheduler exit ###########
+------ Cancelling thread PID# 4 ------
+------ Joining thread PID# 4 ------
+------ Cancelling thread PID# 3 ------
+------ Joining thread PID# 3 ------
+------ Cancelling thread PID# 5 ------
+------ Joining thread PID# 5 ------
+------ Cancelling thread PID# 7 ------
+------ Joining thread PID# 7 ------
+------ Cancelling thread PID# 3 ------
+bash: line 1: 86080 Done                    echo -e "ps\n\004"
+     86081 Segmentation fault      | ./bin/pennos
+
+Script done on 2025-07-10 22:54:32-04:00 [COMMAND_EXIT_CODE="139"]

@@ -1,6 +1,7 @@
 /* ─── src/syscall/syscall_kernel.c ───────────────────────────────────────── */
 #include "syscall_kernel.h"
 #include "../kernel/PCB.h"
+#include "../kernel/kernel_fn.h"
 //#include "../internal/pennfat_kernel.h"
 #include <errno.h>
 #include <stdlib.h>

@@ -107,7 +107,8 @@ void pennos_init() {
     spthread_create(&thrd_shell, NULL, thrd_shell_fn, NULL);    
     pid_count++;    
     pcb_init(thrd_shell, &temp_pcb_ptr, QUEUE_PRIORITY_0, pid_count);  
-    pcb_queue_push(&priority_queue_array[QUEUE_PRIORITY_0], temp_pcb_ptr);     
+    pcb_queue_push(&priority_queue_array[QUEUE_PRIORITY_0], temp_pcb_ptr);
+    k_register_pcb(temp_pcb_ptr);
         
 
 

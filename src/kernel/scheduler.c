@@ -12,6 +12,7 @@
 #include "./PCB.h"
 #include "./pcb_queue.h"
 #include "./kernel_fn.h"
+#include "./klogger.h"
 
 #include <signal.h>
 #include <stdbool.h>
@@ -124,6 +125,7 @@ void* thrd_scheduler_fn(void* arg) {
             spthread_enable_interrupts_self(); // protection OFF
 
             spthread_continue(thrd_handle(curr_pcb_ptr));
+            klog("[%5d]\tSCHEDULE\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(curr_pcb_ptr), queue_type(curr_queue_ptr));
             
             ///////////////////////// for DEBUG /////////////////////////
             spthread_disable_interrupts_self();
