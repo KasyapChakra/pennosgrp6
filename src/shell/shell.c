@@ -12,6 +12,7 @@
 #include "builtins.h"
 #include "../user/syscall_kernel.h"
 #include "../kernel/kernel_fn.h"
+#include "../util/parser.h"
 
 #include <signal.h>
 #include <stdbool.h>
@@ -24,6 +25,7 @@
 /* forward decl for builtins defined in user/shell.c to avoid implicit decl */
 extern void* zombify(void*);
 extern void* orphanify(void*);
+
 
 void write_prompt(char* prompt_input) {
   ssize_t num_bytes_write;
@@ -133,7 +135,6 @@ ssize_t shell_read_cmd(char* cmd_string) {
   // num_bytes_read does not include the last null terminator '\0' added
   if (flag_non_empty_input) {
     return num_bytes_read;  // non-empty input ==> return "true" number of bytes
-                            // read
   }
 
   return 0;  // empty input (end with '\n') ==> return 0
@@ -195,28 +196,49 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
             continue;
         }   
 
-        // simple parsing: first token by whitespace
-        char* saveptr;
-        char* tok = strtok_r(cmd_string, " \t\n", &saveptr);
-        if (!tok) continue;
-
-        if (strcmp(tok, "ps") == 0) {
-            s_spawn(ps_builtin, NULL, -1, -1);
-        } else if (strcmp(tok, "busy") == 0) {
-            s_spawn(busy_builtin, NULL, -1, -1);
-        } else if (strcmp(tok, "zombify") == 0) {
-            s_spawn(zombify, NULL, -1, -1);
-        } else if (strcmp(tok, "orphanify") == 0) {
-            s_spawn(orphanify, NULL, -1, -1);
-        } else {
-            dprintf(STDERR_FILENO, "unknown command: %s\n", tok);
+        // parse the command into the parsed_command structure
+        struct parsed_command* pcmd_ptr = NULL;
+        int parse_ret = parse_command(cmd_string, &pcmd_ptr);
+        if (parse_ret != 0) {
+          /* invalid command */
+          dprintf(STDERR_FILENO, "ERR: invalid user command\n");
+          free(pcmd_ptr);
+          continue;
         }
+
+        if (pcmd_ptr->num_commands == 0) {
+          free(pcmd_ptr);
+          continue;
+        }
+
+        print_parsed_command(pcmd_ptr);
+        dprintf(STDERR_FILENO, "Parsed command: %zu\n", pcmd_ptr->num_commands);
+        
+        // run the shell main function from user/shell.c
+        // this function is modifed to run in this loop but take advantage of the already made command
+        shell_main(pcmd_ptr);
+
+
+        // if (strcmp(tok, "ps") == 0) {
+        //     s_spawn(ps_builtin, NULL, -1, -1);
+        // } else if (strcmp(tok, "busy") == 0) {
+        //     s_spawn(busy_builtin, NULL, -1, -1);
+        // } else if (strcmp(tok, "zombify") == 0) {
+        //     s_spawn(zombify, NULL, -1, -1);
+        // } else if (strcmp(tok, "orphanify") == 0) {
+        //     s_spawn(orphanify, NULL, -1, -1);
+        // } else {
+        //     dprintf(STDERR_FILENO, "unknown command: %s\n", tok);
+        // }
 
         // wait on any finished children before next prompt
         while (s_waitpid(-1, NULL, true) > 0) {
             ;
         }
 
+        free(pcmd_ptr);  // free the parsed command structure
+        pcmd_ptr = NULL;
+        
     }// end of shell-loop
 
     dprintf(STDERR_FILENO, "########### Shell thread ended ###########\n");
