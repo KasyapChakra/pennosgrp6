@@ -5,7 +5,7 @@
  * File Name:           kernel_fn.c
  * File Content:        Implementation of kernel related functions
  * =============================================================== */
- #define _GNU_SOURCE
+#define _GNU_SOURCE
 
 #include "./kernel_fn.h"
 #include "./spthread.h"
@@ -28,6 +28,9 @@
 
 volatile pid_t pid_count;
 volatile bool pennos_done;
+
+#define SHELL_THREAD_NAME "shell"
+#define INIT_THREAD_NAME "init"
 
 pcb_queue_t priority_queue_array[NUM_PRIORITY_QUEUES]; 
 
@@ -115,7 +118,7 @@ void pennos_init() {
     spthread_t thrd_shell;
     spthread_create(&thrd_shell, NULL, thrd_shell_fn, NULL);    
     pid_count++;    
-    pcb_init(thrd_shell, &temp_pcb_ptr, QUEUE_PRIORITY_0, pid_count);  
+    pcb_init(thrd_shell, &temp_pcb_ptr, QUEUE_PRIORITY_0, pid_count, SHELL_THREAD_NAME);
     pcb_queue_push(&priority_queue_array[QUEUE_PRIORITY_0], temp_pcb_ptr);
     k_register_pcb(temp_pcb_ptr);
         
@@ -131,21 +134,21 @@ void pennos_init() {
     // test thread for queue 0
     spthread_create(&temp_spthread, NULL, thrd_print_p0, NULL);
     pid_count++;
-    pcb_init(temp_spthread, &temp_pcb_ptr, 0, pid_count);
+    pcb_init(temp_spthread, &temp_pcb_ptr, 0, pid_count, "Test1");
     pcb_queue_push(&priority_queue_array[0], temp_pcb_ptr);
     k_register_pcb(temp_pcb_ptr);
        
     // test thread for queue 1
     spthread_create(&temp_spthread, NULL, thrd_print_p1, NULL);
     pid_count++;
-    pcb_init(temp_spthread, &temp_pcb_ptr, 1, pid_count);
+    pcb_init(temp_spthread, &temp_pcb_ptr, 1, pid_count, "Test2");
     pcb_queue_push(&priority_queue_array[1], temp_pcb_ptr);
     k_register_pcb(temp_pcb_ptr);
         
     // test thread for queue 2
     spthread_create(&temp_spthread, NULL, thrd_print_p2, NULL);
     pid_count++;
-    pcb_init(temp_spthread, &temp_pcb_ptr, 2, pid_count);  
+    pcb_init(temp_spthread, &temp_pcb_ptr, 2, pid_count, "Test3");  
     pcb_queue_push(&priority_queue_array[2], temp_pcb_ptr);      
     k_register_pcb(temp_pcb_ptr);
 

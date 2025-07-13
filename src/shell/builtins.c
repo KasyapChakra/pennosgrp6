@@ -17,4 +17,4 @@ void* busy_builtin([[maybe_unused]] void* arg) {
 
 /* zombify/orphanify already implemented in user/shell.c – we just declare them extern */
 extern void* zombify(void*);
-extern void* orphanify(void*); 
+extern void* orphanify(void*);

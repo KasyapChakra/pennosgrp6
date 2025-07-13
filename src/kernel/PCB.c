@@ -14,7 +14,8 @@
 
 
 
-int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid) {
+int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid, 
+             char* command) {
 
     pcb_t* temp_pcb_ptr = calloc(1, sizeof(pcb_t));
     if (temp_pcb_ptr == NULL) {
@@ -32,6 +33,7 @@ int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid
     temp_pcb_ptr->child_pids = NULL;
     temp_pcb_ptr->fds = NULL;
     temp_pcb_ptr->next_pcb_ptr = NULL;
+    temp_pcb_ptr->command = command;
 
     *result_pcb = temp_pcb_ptr;
     return 0;

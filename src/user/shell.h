@@ -1,5 +1,5 @@
-#ifndef SHELL_H_
-#define SHELL_H_
+#ifndef USER_SHELL_H_
+#define USER_SHELL_H_
 
 /*****************************************
  *          MAIN PROGRAM                 *
@@ -236,4 +236,4 @@ void *orphan_child_autodie(void *arg);
  */
 void *orphanify(void *arg);
 
-#endif // SHELL_H_
+#endif // USER_SHELL_H_
