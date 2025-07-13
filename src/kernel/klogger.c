@@ -11,7 +11,8 @@ void klog(const char* fmt, ...) {
     /* ensure log directory exists */
     static int init = 0;
     if (!init) {
-        mkdir(LOG_DIR, 0755);
+        mkdir(LOG_DIR, 0755);        
+        unlink(LOG_PATH); // delete the log file from previous runs, if it exists    
         init = 1;
     }
 

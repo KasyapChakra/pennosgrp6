@@ -68,9 +68,10 @@ void pcb_queue_destroy(pcb_queue_t* self_ptr) {
         return;
     }    
 
-    while (!queue_is_empty(self_ptr)) {
-        pcb_t* curr_pcb_ptr = pcb_queue_pop(self_ptr);
-        self_ptr->data_destroy_fn(curr_pcb_ptr);
+    while (!queue_is_empty(self_ptr)) {        
+        // pcb_t* curr_pcb_ptr = pcb_queue_pop(self_ptr);
+        // self_ptr->data_destroy_fn(curr_pcb_ptr);
+        pcb_queue_pop(self_ptr); // do not free each PCB because pcb_vec_destroy() will do
     }
     return;
 }
