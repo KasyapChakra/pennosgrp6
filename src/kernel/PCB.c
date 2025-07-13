@@ -28,6 +28,7 @@ int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid
     temp_pcb_ptr->pid = pid;
     temp_pcb_ptr->pgid = 0;
     temp_pcb_ptr->ppid = 0;
+    temp_pcb_ptr->num_child_pids = 0;
     temp_pcb_ptr->child_pids = NULL;
     temp_pcb_ptr->fds = NULL;
     temp_pcb_ptr->next_pcb_ptr = NULL;

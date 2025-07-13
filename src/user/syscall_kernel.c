@@ -54,7 +54,7 @@ pid_t s_spawn(void* (*func)(void*), char* argv[], int fd0, int fd1) {
   pcb_t* parent = k_get_self_pcb();
   assert_non_null(parent, "s_spawn: parent missing");
 
-  pcb_t* child = k_proc_create(parent);
+  pcb_t* child = k_proc_create(parent, 0);
   if (!child) {
     errno = EAGAIN;
     return -1;

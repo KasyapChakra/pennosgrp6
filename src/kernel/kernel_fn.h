@@ -14,6 +14,7 @@
 #include "./spthread.h"
 #include "./PCB.h"
 #include "./pcb_queue.h"
+#include "./pcb_vec.h"
 
 #define NUM_PRIORITY_QUEUES 3
 
@@ -23,6 +24,9 @@ extern volatile bool pennos_done;
 
 // set queues as global variable so that scheduler thread and other threads can access the queues
 extern pcb_queue_t priority_queue_array[NUM_PRIORITY_QUEUES]; 
+
+// this vector holds all the PCBs (threads) that have not been reaped
+extern pcb_vec_t all_unreaped_pcb_vector;
 
 
 
@@ -54,20 +58,25 @@ void* thrd_print_p0([[maybe_unused]] void* arg);
 void* thrd_print_p1([[maybe_unused]] void* arg);
 void* thrd_print_p2([[maybe_unused]] void* arg);
 
+// ============================ API ============================ //
+
+
+// lifecycle helpers
+pcb_t* k_get_self_pcb(void);
+pcb_t* k_proc_create(pcb_t* parent_pcb_ptr, int priority_code);
+int k_proc_cleanup(pcb_t* pcb_ptr);
+int k_set_routine_and_run(pcb_t* pcb_ptr, void* (*start_routine)(void*), void* arg);
+void k_register_pcb(pcb_t* pcb_ptr);
+
+// pid helpers
+pid_t   k_get_pid(pcb_t* pcb_ptr);
+
+
 // ============================ Process & syscall helpers (new) ============================ //
 // NOTE: these are early stubs – implementations live in kernel_syscall.c
 // they will be fleshed out incrementally. all comments are kept lowercase per user request.
 
 typedef unsigned int clock_tick_t;
-
-// lifecycle helpers
-pcb_t* k_get_self_pcb(void);
-pcb_t* k_proc_create(pcb_t* parent);
-int     k_proc_cleanup(pcb_t* proc);
-int     k_set_routine_and_run(pcb_t* proc, void* (*start_routine)(void*), void* arg);
-
-// pid helpers
-pid_t   k_get_pid(pcb_t* proc);
 
 // wait / signal / scheduling helpers (stub for now)
 pid_t   k_waitpid(pid_t pid, int* wstatus, bool nohang);
@@ -81,6 +90,9 @@ int     k_pipe(int fds[2]);
 void    k_printprocess(void);
 void    k_exit(void);
 
+
+
+/*
 // filesystem stubs (not implemented yet)
 int k_open(const char* fname, int mode);
 int k_close(int fd);
@@ -92,7 +104,8 @@ int k_rename(const char* oldname, const char* newname);
 int k_touch(const char* fname);
 int k_ls(const char* fname);
 int k_chmod(const char* fname, unsigned char perm);
+*/
 
-void k_register_pcb(pcb_t* p);
+
 
 #endif  // KERNEL_FN_H_

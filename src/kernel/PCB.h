@@ -29,7 +29,8 @@ typedef struct pcb_st {
     pid_t pid;
     pid_t pgid;
     pid_t ppid;
-    pid_t* child_pids; // array of children pids (size = num_commands)
+    int num_child_pids;
+    pid_t* child_pids; // array of children pids (size = num_child_pids)
     int* fds; // array of file descriptors
     struct pcb_st* next_pcb_ptr;
 
@@ -43,6 +44,7 @@ typedef struct pcb_st {
 #define thrd_pid(pcb_ptr) ((pcb_ptr)->pid)
 #define thrd_pgid(pcb_ptr) ((pcb_ptr)->pgid)
 #define thrd_ppid(pcb_ptr) ((pcb_ptr)->ppid)
+#define thrd_num_child(pct_ptr) ((pcb_ptr)->num_child_pids)
 #define thrd_next(pcb_ptr) ((pcb_ptr)->next_pcb_ptr)
 
 // ============================ Functions ============================ //

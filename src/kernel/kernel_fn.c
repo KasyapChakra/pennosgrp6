@@ -11,21 +11,28 @@
 #include "./spthread.h"
 #include "./PCB.h"
 #include "./pcb_queue.h"
+#include "./pcb_vec.h"
 #include "./scheduler.h"
 #include "../shell/shell.h"
+#include "./klogger.h"
+#include "../common/pennfat_errors.h"
 
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 
 
 volatile pid_t pid_count;
 volatile bool pennos_done;
 
-// set queues as global variable so that scheduler thread and other threads can access the queues
 pcb_queue_t priority_queue_array[NUM_PRIORITY_QUEUES]; 
+
+pcb_vec_t all_unreaped_pcb_vector;
+
 
 volatile int count_p0 = 0; // debug //////////
 volatile int count_p1 = 0; // debug //////////
@@ -66,7 +73,6 @@ void cancel_and_join_thrd(spthread_t thread) {
 }
 
 
-
 void pennos_init() {
 
     // block SIGALRM | SIGINT | SIGTSTP (the mask is inherited by all child threads)
@@ -79,13 +85,16 @@ void pennos_init() {
 
     pennos_done = false;    
 
-    // pid_count starts at 1 because init thread is the 1st thread
-    pid_count = 1;
+    // pid_count starts at 0 because init thread is the 1st thread
+    pid_count = 0;
 
     // initialize 3 Round Robin queues with different priority
     for (int i = 0; i < NUM_PRIORITY_QUEUES; i++) {
-        priority_queue_array[i] = pcb_queue_init(i);
-    }    
+        priority_queue_array[i] = pcb_queue_init(i); // need to be destroyed later
+    }  
+
+    // initialize PCB vector to hold all unreaped PCBs
+    all_unreaped_pcb_vector = pcb_vec_new(0, pcb_destroy); // need to be destroyed later
     
     // set up and start scheduler thread
     spthread_t thrd_scheduler;
@@ -124,19 +133,21 @@ void pennos_init() {
     pid_count++;
     pcb_init(temp_spthread, &temp_pcb_ptr, 0, pid_count);
     pcb_queue_push(&priority_queue_array[0], temp_pcb_ptr);
-
+    k_register_pcb(temp_pcb_ptr);
        
     // test thread for queue 1
     spthread_create(&temp_spthread, NULL, thrd_print_p1, NULL);
     pid_count++;
     pcb_init(temp_spthread, &temp_pcb_ptr, 1, pid_count);
     pcb_queue_push(&priority_queue_array[1], temp_pcb_ptr);
+    k_register_pcb(temp_pcb_ptr);
         
     // test thread for queue 2
     spthread_create(&temp_spthread, NULL, thrd_print_p2, NULL);
     pid_count++;
     pcb_init(temp_spthread, &temp_pcb_ptr, 2, pid_count);  
     pcb_queue_push(&priority_queue_array[2], temp_pcb_ptr);      
+    k_register_pcb(temp_pcb_ptr);
 
     // print info for the 3 queues for debug ///////////////////
     print_queue_info(&priority_queue_array[0]);
@@ -166,6 +177,7 @@ void pennos_init() {
         pcb_queue_destroy(&priority_queue_array[i]); 
     }  
     
+    pcb_vec_destroy(&all_unreaped_pcb_vector);
     
 
     dprintf(STDERR_FILENO, "Final total tick: # %d\n", cumulative_tick_global);  
@@ -218,15 +230,5 @@ void* thrd_print_p2([[maybe_unused]] void* arg) {
     }
     return NULL;
 }
-
-
-
-
-
-
-
-
-
-
 
 
