@@ -244,7 +244,9 @@ int k_set_routine_and_run(pcb_t* pcb_ptr, void* (*start_routine)(void*), void* a
     }
 
     spthread_disable_interrupts_self();
+    print_queue_info(&priority_queue_array[priority]);
     pcb_queue_push(&priority_queue_array[priority], pcb_ptr);
+    print_queue_info(&priority_queue_array[priority]);
     spthread_enable_interrupts_self();
 
     return 0;
