@@ -85,12 +85,12 @@ static cmd_func_match_t inline_funcs[] = {{"nice", u_nice},
 static bool exit_shell = false;
 static pid_t shell_pgid; /* for signal-forwarding */
 
-static pid_t process_one_command(char*** cmdv,
-                                 size_t stages,
-                                 const char* stdin_file,
-                                 const char* stdout_file,
-                                 const char* stderr_file,
-                                 bool append_out);
+// static pid_t process_one_command(char*** cmdv,
+//                                  size_t stages,
+//                                  const char* stdin_file,
+//                                  const char* stdout_file,
+//                                  const char* stderr_file,
+//                                  bool append_out);
 
 static thd_func_t get_func_from_cmd(const char* cmd_name,
                                     cmd_func_match_t* table);
@@ -111,7 +111,7 @@ static int open_for_write(const char* path, bool append) {
 }
 
 static pid_t spawn_stage(char** argv, int fd_in, int fd_out);
-static int open_redirect(int* fd, const char* path, int flags);
+// static int open_redirect(int* fd, const char* path, int flags);
 
 /*──────────────────────────────────────────────────────────────*/
 /*                NEW  BUILT-IN  IMPLEMENTATIONS                */
@@ -434,12 +434,17 @@ int shell_main(struct parsed_command* cmd) {
 
   dprintf(STDERR_FILENO, "shell_main: past opening redirections\n");
 
-  pid_t child_pid = process_one_command(
-      cmd->commands, cmd->num_commands, cmd->stdin_file, cmd->stdout_file,
-      /* stderr */ NULL, cmd->is_file_append);
+  // pid_t child_pid = process_one_command(
+  //     cmd->commands, cmd->num_commands, cmd->stdin_file, cmd->stdout_file,
+  //     /* stderr */ NULL, cmd->is_file_append);
 
-  if (child_pid <= 0)
-    return 0;
+  // if (child_pid <= 0)
+  //   return 0;
+
+  dprintf(STDERR_FILENO, "command: %s %s %s\n", cmd->commands[0][0], 
+          cmd->commands[0][1], cmd->commands[0][2]);
+
+  pid_t child_pid = spawn_stage(cmd->commands[0], redir_in, redir_out); // stuck in wait. Problem with spawn
 
   if (!cmd->is_background) { /* foreground job           */
     s_tcsetpid(child_pid);
@@ -748,15 +753,15 @@ void* logout_cmd(void* arg) {
 /*  piping helpers / process_one_command – unchanged                */
 /*------------------------------------------------------------------*/
 
-static int open_redirect(int* fd, const char* path, int flags) {
-  int newfd = s_open(path, flags);
-  if (newfd < 0) {
-    fprintf(stderr, "shell: cannot open %s\n", path);
-    return -1;
-  }
-  *fd = newfd;
-  return 0;
-}
+// static int open_redirect(int* fd, const char* path, int flags) {
+//   int newfd = s_open(path, flags);
+//   if (newfd < 0) {
+//     fprintf(stderr, "shell: cannot open %s\n", path);
+//     return -1;
+//   }
+//   *fd = newfd;
+//   return 0;
+// }
 
 static pid_t spawn_stage(char** argv, int fd_in, int fd_out) {
   if (!argv || !argv[0])
@@ -770,64 +775,64 @@ static pid_t spawn_stage(char** argv, int fd_in, int fd_out) {
   return s_spawn(func, argv, fd_in, fd_out);
 }
 
-static pid_t process_one_command(char** cmdv[],
-                                 size_t stages,
-                                 const char* stdin_file,
-                                 const char* stdout_file,
-                                 const char* stderr_file,
-                                 bool append_out) {
-  /* … body unchanged … */
-  int prev_rd = STDIN_FILENO;
-  int first_pid = -1;
+// static pid_t process_one_command(char** cmdv[],
+//                                  size_t stages,
+//                                  const char* stdin_file,
+//                                  const char* stdout_file,
+//                                  const char* stderr_file,
+//                                  bool append_out) {
+//   /* … body unchanged … */
+//   int prev_rd = STDIN_FILENO;
+//   int first_pid = -1;
 
-  /* optional <  redirection for very first stage */
-  if (stdin_file && open_redirect(&prev_rd, stdin_file, K_O_RDONLY) < 0)
-    return -1;
+//   /* optional <  redirection for very first stage */
+//   if (stdin_file && open_redirect(&prev_rd, stdin_file, K_O_RDONLY) < 0)
+//     return -1;
 
-  for (size_t s = 0; s < stages; ++s) {
-    int pipefds[2] = {-1, -1};
-    int this_out = STDOUT_FILENO;
+//   for (size_t s = 0; s < stages; ++s) {
+//     int pipefds[2] = {-1, -1};
+//     int this_out = STDOUT_FILENO;
 
-    /* if NOT last stage, create a pipe */
-    if (s + 1 < stages) {
-      if (s_pipe(pipefds) < 0) {
-        perror("pipe");
-        return -1;
-      }
-      this_out = pipefds[1]; /* writer for this stage        */
-    } else {
-      /* last stage may have > or >>   */
-      if (stdout_file) {
-        int flags = K_O_CREATE | (append_out ? K_O_APPEND : K_O_WRONLY);
-        if (open_redirect(&this_out, stdout_file, flags) < 0)
-          return -1;
-      }
-    }
+//     /* if NOT last stage, create a pipe */
+//     if (s + 1 < stages) {
+//       if (s_pipe(pipefds) < 0) {
+//         perror("pipe");
+//         return -1;
+//       }
+//       this_out = pipefds[1]; /* writer for this stage        */
+//     } else {
+//       /* last stage may have > or >>   */
+//       if (stdout_file) {
+//         int flags = K_O_CREATE | (append_out ? K_O_APPEND : K_O_WRONLY);
+//         if (open_redirect(&this_out, stdout_file, flags) < 0)
+//           return -1;
+//       }
+//     }
 
-    /* stderr redirection only applies to *last* stage (bash semantics) */
-    if (s + 1 == stages && stderr_file) {
-      int fd;
-      if (open_redirect(&fd, stderr_file, K_O_CREATE | K_O_WRONLY) < 0)
-        return -1;
-      /* (child duplicates fd on FD 2 inside spawn)                   */
-    }
+//     /* stderr redirection only applies to *last* stage (bash semantics) */
+//     if (s + 1 == stages && stderr_file) {
+//       int fd;
+//       if (open_redirect(&fd, stderr_file, K_O_CREATE | K_O_WRONLY) < 0)
+//         return -1;
+//       /* (child duplicates fd on FD 2 inside spawn)                   */
+//     }
 
-    pid_t pid = spawn_stage(cmdv[s], prev_rd, this_out);
-    if (pid < 0)
-      return -1;
-    if (first_pid == -1)
-      first_pid = pid;
+//     pid_t pid = spawn_stage(cmdv[s], prev_rd, this_out);
+//     if (pid < 0)
+//       return -1;
+//     if (first_pid == -1)
+//       first_pid = pid;
 
-    /* parent closes ends it no longer needs */
-    if (prev_rd != STDIN_FILENO)
-      s_close(prev_rd);
-    if (this_out != STDOUT_FILENO)
-      s_close(this_out);
+//     /* parent closes ends it no longer needs */
+//     if (prev_rd != STDIN_FILENO)
+//       s_close(prev_rd);
+//     if (this_out != STDOUT_FILENO)
+//       s_close(this_out);
 
-    prev_rd = pipefds[0]; /* read end for next iteration (or dangling) */
-  }
-  return first_pid;
-}
+//     prev_rd = pipefds[0]; /* read end for next iteration (or dangling) */
+//   }
+//   return first_pid;
+// }
 
 static thd_func_t get_func_from_cmd(const char* cmd_name,
                                     cmd_func_match_t* func_match) {
