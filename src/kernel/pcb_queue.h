@@ -20,7 +20,8 @@ typedef enum {
     QUEUE_PRIORITY_1 = 1,
     QUEUE_PRIORITY_2 = 2,     
     QUEUE_BLOCKED = 3,
-    QUEUE_ZOMBIE = 4    
+    QUEUE_STOPPED = 4,
+    QUEUE_ZOMBIE = 5    
 } queue_type_t;
 
 typedef void (*data_destroy_fn_ptr)(pcb_t*);

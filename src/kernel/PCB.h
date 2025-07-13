@@ -32,6 +32,7 @@ typedef struct pcb_st {
     int num_child_pids;
     pid_t* child_pids; // array of children pids (size = num_child_pids)
     int* fds; // array of file descriptors
+    unsigned long wake_tick; // scheduler tick when this thread should wake (valid if status==THRD_BLOCKED)
     struct pcb_st* next_pcb_ptr;
     char* command; // command string associated with this PCB
 
