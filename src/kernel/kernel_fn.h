@@ -25,6 +25,15 @@ extern volatile bool pennos_done;
 // set queues as global variable so that scheduler thread and other threads can access the queues
 extern pcb_queue_t priority_queue_array[NUM_PRIORITY_QUEUES]; 
 
+// global queue holding all PCBs currently blocked (e.g. sleeping)
+extern pcb_queue_t blocked_queue;
+// queue holding threads that are STOPPED via P_SIGSTOP
+extern pcb_queue_t stopped_queue;
+
+// simplified internal signal numbers (avoid clashing with host signals)
+#define P_SIGTERM  15
+#define P_SIGSTOP  17
+#define P_SIGCONT  19
 // this vector holds all the PCBs (threads) that have not been reaped
 extern pcb_vec_t all_unreaped_pcb_vector;
 

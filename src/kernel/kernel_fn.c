@@ -34,6 +34,9 @@ volatile bool pennos_done;
 
 pcb_queue_t priority_queue_array[NUM_PRIORITY_QUEUES]; 
 
+pcb_queue_t blocked_queue; // queue of blocked/sleeping threads
+pcb_queue_t stopped_queue; // queue of stopped threads
+// this vector holds all the PCBs (threads) that have not been reaped
 pcb_vec_t all_unreaped_pcb_vector;
 
 
@@ -91,11 +94,13 @@ void pennos_init() {
     // pid_count starts at 0 because init thread is the 1st thread
     pid_count = 0;
 
-    // initialize 3 Round Robin queues with different priority
+    // initialize 3 Round Robin queues for RUNNING threads, plus blocked queue
     for (int i = 0; i < NUM_PRIORITY_QUEUES; i++) {
         priority_queue_array[i] = pcb_queue_init(i); // need to be destroyed later
     }  
 
+    blocked_queue = pcb_queue_init(QUEUE_BLOCKED);
+    stopped_queue = pcb_queue_init(QUEUE_STOPPED);
     // initialize PCB vector to hold all unreaped PCBs
     all_unreaped_pcb_vector = pcb_vec_new(0, pcb_destroy); // need to be destroyed later
     
@@ -156,12 +161,11 @@ void pennos_init() {
     print_queue_info(&priority_queue_array[0]);
     print_queue_info(&priority_queue_array[1]);
     print_queue_info(&priority_queue_array[2]);   
-    
+
 
 
     ///////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////  
-
 
     spthread_join(thrd_scheduler, NULL); // wait for scheduler thread to join
 
@@ -181,6 +185,9 @@ void pennos_init() {
     }  
     
     pcb_vec_destroy(&all_unreaped_pcb_vector);
+
+    pcb_queue_destroy(&blocked_queue);
+    pcb_queue_destroy(&stopped_queue);
     
 
     dprintf(STDERR_FILENO, "Final total tick: # %d\n", cumulative_tick_global);  
