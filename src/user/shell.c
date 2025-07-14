@@ -348,17 +348,24 @@ void* cp(void* arg) {
 }
 
 /* mv  SRC DST  — rename inside PennFAT */
+/* mv SOURCE DEST — rename one file to another */
 void* mv(void* arg) {
   char** argv = (char**)arg;
   if (!argv || !argv[1] || !argv[2]) {
-    fprintf(stderr, "mv: usage: mv SRC DST\n");
+    fprintf(stderr, "mv: usage: mv SOURCE DEST\n");
     return NULL;
   }
 
-  if (s_rename(argv[1], argv[2]) != 0)
-    fprintf(stderr, "mv: cannot rename %s -> %s\n", argv[1], argv[2]);
+  PennFatErr err = s_rename(argv[1], argv[2]);
+  if (err != PennFatErr_SUCCESS) {
+    fprintf(stderr,
+            "Error renaming %s to %s: %s\n",
+            argv[1], argv[2],
+            PennFatErr_toErrString(err));
+  }
   return NULL;
 }
+
 
 /* rm  FILE…  — delete one or more files */
 void* rm(void* arg) {
