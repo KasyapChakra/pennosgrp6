@@ -25,6 +25,7 @@ int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid
 
     temp_pcb_ptr->thrd = thread;
     temp_pcb_ptr->status = THRD_STOPPED;
+    temp_pcb_ptr->pre_status = thrd_status(temp_pcb_ptr);
     temp_pcb_ptr->priority_level = priority_code;
     temp_pcb_ptr->pid = pid;
     temp_pcb_ptr->pgid = 0;
