@@ -12,8 +12,10 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-
 #include "./spthread.h"
+#include "./kernel_definition.h"
+
+#define NUM_CHILDREN_MAX 128
 
 typedef enum {
     THRD_RUNNING = 0, // running | ready
@@ -23,18 +25,33 @@ typedef enum {
 } thrd_status_t;
 
 typedef struct pcb_st {
+    // --- ID ---
     spthread_t thrd;
-    thrd_status_t status; // 0 (running) | 1 (stopped) | 2 (blocked) | 3 (zombie)
-    thrd_status_t pre_status; // 0 (running) | 1 (stopped) | 2 (blocked) | 3 (zombie)
-    int priority_level; // 0 (high) | 1 (mid) | 2 (low)    
     pid_t pid;
     pid_t pgid;
     pid_t ppid;
-    int num_child_pids;
-    pid_t* child_pids; // array of children pids (size = num_child_pids)
-    int* fds; // array of file descriptors
-    struct pcb_st* next_pcb_ptr;
+
+    // --- attributes ---
+    int priority_level; // 0 (high) | 1 (mid) | 2 (low)    
     char* command; // command string associated with this PCB
+
+    // --- child info ---
+    int num_child_pids;
+    pid_t child_pids[NUM_CHILDREN_MAX]; // array of children pids (size = num_child_pids)
+
+    // --- for priority queue link list ---
+    struct pcb_st* next_pcb_ptr;    
+
+    // --- status related ---
+    thrd_status_t status; // 0 (running) | 1 (stopped) | 2 (blocked) | 3 (zombie)
+    bool status_changed;    // still false if status changed to BLOCKED or RUNNING
+                            // only set true if status changed to STOPPED or ZOMBIE
+    int exit_code;
+    k_signal_t term_signal;
+    k_signal_t stop_signal;
+
+    // --- others (to be decided) ---
+    int* fds; // array of file descriptors
 
 } pcb_t;
 
@@ -43,7 +60,7 @@ typedef struct pcb_st {
 #define thrd_handle(pcb_ptr) ((pcb_ptr)->thrd)
 #define thrd_status(pcb_ptr) ((pcb_ptr)->status)
 #define thrd_pre_status(pcb_ptr) ((pcb_ptr)->pre_status)
-#define thrd_is_status_change(pcb_ptr) ((pcb_ptr)->status == (pcb_ptr)->pre_status)
+#define thrd_is_status_change(pcb_ptr) ((pcb_ptr)->status_changed)
 #define thrd_priority(pcb_ptr) ((pcb_ptr)->priority_level)
 #define thrd_pid(pcb_ptr) ((pcb_ptr)->pid)
 #define thrd_pgid(pcb_ptr) ((pcb_ptr)->pgid)

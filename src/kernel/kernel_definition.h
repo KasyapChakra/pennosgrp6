@@ -12,22 +12,33 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+typedef enum {
+    P_SIGSTOP = 1,
+    P_SIGCONT = 2, 
+    P_SIGTERM = 3 
+} k_signal_t;
+
 // ------------ for waitpid() ------------ //
 typedef enum {
-    K_NOERROR = 0,
-    K_EINTR = 1, // waitpid() was interrupted, safe to retry    
-    K_ECHILD = 2 // there are no child processes with specified pid or pgid
+    P_NOERROR = 0,
+    P_EINTR = 1, // waitpid() was interrupted, safe to retry    
+    P_ECHILD = 2 // there are no child processes with specified pid or pgid
 } k_errno_t;
 
-#define STATUS_EXITED     0x00
-#define STATUS_SIGNALED   0x01
-#define STATUS_CONTINUED  0x02
-#define STATUS_STOPPED    0x7f
 
-#define K_WIFEXITED(wstatus)   (((wstatus) & 0xff) == STATUS_EXITED)
-#define K_WIFSIGNALED(wstatus) (((wstatus) & 0xff) == STATUS_SIGNALED)
-#define K_WIFCONTINUED(wstatus) (((wstatus) & 0xff) == STATUS_CONTINUED)
-#define K_WIFSTOPPED(wstatus)  (((wstatus) & 0xff) == STATUS_STOPPED)
+// exit normally
+#define P_WIFEXITED(wstatus)     (((wstatus) & 0x7F) == 0) // returns true if exited normally (bit 0-6 all ZEROs)
+#define P_WEXITSTATUS(wstatus)   (((wstatus) >> 8) & 0xFF) // returns exit code for a thread exited normally (bit 8-15)
+// terminated by signal
+#define P_WIFSIGNALED(wstatus)   (((wstatus) & 0x7F) != 0 && ((wstatus) & 0x7F) != 0x7F) // returns true if terminated by a signal (bit 0-6 neither all ZEROs nor all ONEs)
+#define P_WTERMSIG(wstatus)      ((wstatus) & 0x7F) // returns signal number that caused the termination (bit 0-6)
+// stopped
+#define P_WIFSTOPPED(wstatus)    (((wstatus) & 0xFF) == 0x7F) // returns true if the thread was stopped (bit 0-6 all ONEs)
+#define P_WSTOPSIG(wstatus)      (((wstatus) >> 8) & 0xFF) // returns the signal number that causes the stop (bit 8-15)
+
+
+
+
 
 // --------------------------------------- //
 

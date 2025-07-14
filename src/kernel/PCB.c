@@ -23,18 +23,32 @@ int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid
         return -1;
     }
 
+    // --- ID ---
     temp_pcb_ptr->thrd = thread;
-    temp_pcb_ptr->status = THRD_STOPPED;
-    temp_pcb_ptr->pre_status = thrd_status(temp_pcb_ptr);
-    temp_pcb_ptr->priority_level = priority_code;
     temp_pcb_ptr->pid = pid;
     temp_pcb_ptr->pgid = 0;
     temp_pcb_ptr->ppid = 0;
-    temp_pcb_ptr->num_child_pids = 0;
-    temp_pcb_ptr->child_pids = NULL;
+
+    // --- attributes ---
+    temp_pcb_ptr->priority_level = priority_code;
+    temp_pcb_ptr->command = command;    
+
+    // --- child info ---
+    temp_pcb_ptr->num_child_pids = 0;    
+
+    // --- for priority queue link list ---
+    temp_pcb_ptr->next_pcb_ptr = NULL;       
+
+    // --- status related ---
+    temp_pcb_ptr->status = THRD_STOPPED;
+    temp_pcb_ptr->status_changed = false;
+    temp_pcb_ptr->exit_code = 0;
+    temp_pcb_ptr->term_signal = 0;
+    temp_pcb_ptr->stop_signal = 0;
+
+    // --- others (to be decided) ---
     temp_pcb_ptr->fds = NULL;
-    temp_pcb_ptr->next_pcb_ptr = NULL;
-    temp_pcb_ptr->command = command;
+
 
     *result_pcb = temp_pcb_ptr;
     return 0;

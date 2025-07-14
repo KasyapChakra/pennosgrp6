@@ -6,6 +6,7 @@
 #include "../common/pennfat_errors.h"
 #include "./klogger.h"
 #include "./kernel_definition.h"
+#include "../util/panic.h"
 
 #include <pthread.h>
 #include <stdlib.h>
@@ -140,8 +141,7 @@ pcb_t* k_proc_create(pcb_t* parent_pcb_ptr, int priority_code) {
     spthread_enable_interrupts_self();
     pcb_ptr->pgid = pcb_ptr->pid;
     pcb_ptr->ppid = parent_pcb_ptr ? thrd_pid(parent_pcb_ptr) : 0;
-    pcb_ptr->num_child_pids = 0;
-    pcb_ptr->child_pids = NULL;
+    pcb_ptr->num_child_pids = 0;    
     pcb_ptr->fds = NULL;
     pcb_ptr->next_pcb_ptr = NULL;    
 
@@ -325,40 +325,41 @@ pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
 
                 no_update = false;
 
-                curr_pcb_ptr->pre_status = thrd_status(curr_pcb_ptr);
-
                 if (thrd_status(curr_pcb_ptr) == THRD_STOPPED) {
-                    k_errno = STATUS_STOPPED;
-                    return thrd_pid(curr_pcb_ptr);
-                }
-
-                if (thrd_status(curr_pcb_ptr) == THRD_RUNNING) {
-                    k_errno = STATUS_CONTINUED;
+                    if (curr_pcb_ptr->stop_signal != P_SIGSTOP) {
+                        panic("Thread was stopped but not by P_SIGSTOP!\n");
+                    }
+                    *wstatus = (curr_pcb_ptr->stop_signal << 8) | 0x7F;                    
                     return thrd_pid(curr_pcb_ptr);
                 }
 
                 if (thrd_status(curr_pcb_ptr) == THRD_ZOMBIE) {
-                    k_errno = STATUS_EXITED;
-                    return thrd_pid(curr_pcb_ptr);
+                    if (curr_pcb_ptr->term_signal == 0) {
+                        // exited normally
+                        *wstatus = curr_pcb_ptr->exit_code << 8;                        
+                    } else {
+                        // terminated by signal
+                        if (curr_pcb_ptr->term_signal != P_SIGTERM) {
+                            panic("Thread was terminated but not by P_SIGTERM!\n");
+                        }
+                        *wstatus = curr_pcb_ptr->term_signal;
+                    }                    
+                    pid_t result_pid = thrd_pid(curr_pcb_ptr);
+
+                    // pop up the pcb and clear it
+
+                    return result_pid;
                 }
+
+                // can implement WIFCONTINUED if needed
+
+                curr_pcb_ptr->status_changed = false;                
             }
 
-            // OLD CODE TO DELETE LATER
-            /*
-            if (is_child && pid_match && thrd_status(curr_pcb_ptr)== THRD_ZOMBIE) {
-                pid_t cid = thrd_pid(curr_pcb_ptr);
-                if (wstatus) {
-                    *wstatus = 0; // no exit code yet
-                }
-                klog("[%5d]\tWAITED\t%d\t%d\tprocess", cumulative_tick_global, cid, thrd_priority(curr_pcb_ptr));
-                k_proc_cleanup(curr_pcb_ptr);
-                return cid;                
-            }
-            */
         }
 
         if (no_target_child) {
-            k_errno = K_ECHILD;
+            k_errno = P_ECHILD;
             return -1;
         }
 

@@ -88,7 +88,7 @@ void pennos_init() {
     pthread_sigmask(SIG_BLOCK, &sig_set_init, NULL);       
 
     pennos_done = false;    
-    k_errno = K_NOERROR;
+    k_errno = P_NOERROR;
 
     // pid_count starts at 1 because init thread is the 1st thread
     pid_count = 1;
