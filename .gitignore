@@ -6,3 +6,4 @@ src/shell/*.o
 
 # OS files
 .DS_Store
+!bin/.gitkeep
