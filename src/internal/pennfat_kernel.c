@@ -54,17 +54,7 @@ void pennfat_kernel_cleanup(void) {
   128  // Subject to change; maximum number of entries in the root directory
 
 /* Allowed block sizes mapping */
-static const int block_sizes[] = {
-  256,    // config 0
-  512,    // config 1
-  1024,   // config 2
-  2048,   // config 3
-  4096,   // config 4
-  8192,   // config 5
-  16384,  // config 6
-  32000   // config 7 (maxfs!)
-};
-
+static const int block_sizes[] = {256, 512, 1024, 2048, 4096};
 
 // ---------------------------------------------------------------------------
 // 2) GLOBAL DATA STRUCTURES
@@ -2067,7 +2057,8 @@ PennFatErr k_mount(const char* fs_name) {
   uint8_t block_size_config = super_entry & 0xFF;
   uint8_t fat_blocks = (super_entry >> 8) & 0xFF;
 
-  if (block_size_config > 4) {
+  size_t n_cfgs = sizeof(block_sizes) / sizeof(block_sizes[0]);
+  if (block_size_config >= n_cfgs) {
     LOG_ERR("[k_mount] Invalid block size config: %u", block_size_config);
     close(fd);
     return PennFatErr_INVAD;
@@ -2299,12 +2290,11 @@ PennFatErr k_mkfs(const char* fs_name,
         "[k_mkfs] Invalid number of blocks in FAT. Must be between 1 and 32.");
     return PennFatErr_INVAD;
   }
-  int n_sizes = sizeof(block_sizes) / sizeof(block_sizes[0]);
-  if (block_size_config < 0 || block_size_config >= n_sizes) {
-  LOG_ERR("[k_%s] Invalid block size config: %u", __func__, block_size_config);
-  return PennFatErr_INVAD;
+  if (block_size_config < 0 || block_size_config > 4) {
+    LOG_ERR(
+        "[k_mkfs] Invalid block size configuration. Must be between 0 and 4.");
+    return PennFatErr_INVAD;
   }
-
   uint32_t block_size = block_sizes[block_size_config];
 
   /* Calculate region sizes:

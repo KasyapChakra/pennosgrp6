@@ -559,7 +559,7 @@ static void rm(const char** args) {
   while (*args) {
     status = k_unlink(*args);
     if (status) {
-      fprintf(stderr, "rm failed for %s: %s\n", *args,
+      fprintf(stderr, "Error removing %s: %s\n", *args,
               PennFatErr_toErrString(status));
     }
     args++;
