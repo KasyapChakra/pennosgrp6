@@ -369,13 +369,13 @@ void* rm(void* arg) {
   }
 
   for (int i = 1; argv[i]; ++i) {
-    PennFatErr err = s_unlink(argv[i]);
-    if (err != 0) {
-      fprintf(stderr, "Error: rm failed for %s: %s\n", 
-              argv[i], PennFatErr_toErrString(err));
-              //Output to errostring
-    }
+  PennFatErr err = s_unlink(argv[i]);
+  if (err != PennFatErr_SUCCESS) {
+    fprintf(stderr, "Error removing %s: %s\n",
+            argv[i], PennFatErr_toErrString(err));
   }
+}
+
   return NULL;
 }
 
