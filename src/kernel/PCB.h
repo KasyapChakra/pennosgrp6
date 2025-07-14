@@ -25,6 +25,7 @@ typedef enum {
 typedef struct pcb_st {
     spthread_t thrd;
     thrd_status_t status; // 0 (running) | 1 (stopped) | 2 (blocked) | 3 (zombie)
+    thrd_status_t pre_status; // 0 (running) | 1 (stopped) | 2 (blocked) | 3 (zombie)
     int priority_level; // 0 (high) | 1 (mid) | 2 (low)    
     pid_t pid;
     pid_t pgid;
@@ -41,6 +42,8 @@ typedef struct pcb_st {
 // ========================= Functions-like macros ========================= //
 #define thrd_handle(pcb_ptr) ((pcb_ptr)->thrd)
 #define thrd_status(pcb_ptr) ((pcb_ptr)->status)
+#define thrd_pre_status(pcb_ptr) ((pcb_ptr)->pre_status)
+#define thrd_is_status_change(pcb_ptr) ((pcb_ptr)->status == (pcb_ptr)->pre_status)
 #define thrd_priority(pcb_ptr) ((pcb_ptr)->priority_level)
 #define thrd_pid(pcb_ptr) ((pcb_ptr)->pid)
 #define thrd_pgid(pcb_ptr) ((pcb_ptr)->pgid)

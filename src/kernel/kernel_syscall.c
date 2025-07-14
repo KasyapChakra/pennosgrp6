@@ -5,6 +5,7 @@
 #include "./spthread.h"
 #include "../common/pennfat_errors.h"
 #include "./klogger.h"
+#include "./kernel_definition.h"
 
 #include <pthread.h>
 #include <stdlib.h>
@@ -306,13 +307,44 @@ pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
         return -1;
     }
 
-
-    // not finished, need to complete //////debug
+    // not finished, need to complete //////debug    
     while (true) {
+        bool no_target_child = true; // relevent for ECHILD
+        bool no_update = true; // relevant for NOHANG
+
         for (int i = 0; i < pcb_vec_len(&all_unreaped_pcb_vector); i++) {
             pcb_t* curr_pcb_ptr = all_unreaped_pcb_vector.pcb_ptr_array[i];
             bool is_child = (thrd_ppid(curr_pcb_ptr) == thrd_pid(self_pcb_ptr));
-            bool pid_match = ((pid == -1) || (thrd_pid(curr_pcb_ptr) == pid));
+            bool pid_match = ((pid == -1) || (thrd_pid(curr_pcb_ptr) == pid) || (thrd_pgid(curr_pcb_ptr) == -pid));
+            if (is_child && pid_match) {
+                no_target_child = false;
+
+                if (!thrd_is_status_change(curr_pcb_ptr)) {
+                    continue;
+                }
+
+                no_update = false;
+
+                curr_pcb_ptr->pre_status = thrd_status(curr_pcb_ptr);
+
+                if (thrd_status(curr_pcb_ptr) == THRD_STOPPED) {
+                    k_errno = STATUS_STOPPED;
+                    return thrd_pid(curr_pcb_ptr);
+                }
+
+                if (thrd_status(curr_pcb_ptr) == THRD_RUNNING) {
+                    k_errno = STATUS_CONTINUED;
+                    return thrd_pid(curr_pcb_ptr);
+                }
+
+                if (thrd_status(curr_pcb_ptr) == THRD_ZOMBIE) {
+                    k_errno = STATUS_EXITED;
+                    return thrd_pid(curr_pcb_ptr);
+                }
+            }
+
+            // OLD CODE TO DELETE LATER
+            /*
             if (is_child && pid_match && thrd_status(curr_pcb_ptr)== THRD_ZOMBIE) {
                 pid_t cid = thrd_pid(curr_pcb_ptr);
                 if (wstatus) {
@@ -322,11 +354,19 @@ pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
                 k_proc_cleanup(curr_pcb_ptr);
                 return cid;                
             }
+            */
         }
 
-        if (nohang) {
-            return 0; // nothing yet, caller doesn’t want to block
+        if (no_target_child) {
+            k_errno = K_ECHILD;
+            return -1;
         }
+
+        if (nohang && no_update) {
+            return 0;   // there still exist non-zombie children
+                        // there are no update from these children since last wait                         
+        }
+
         /* crude sleep before retry to avoid busy spin */
         usleep(1000); // 1ms
     }

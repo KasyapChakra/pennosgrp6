@@ -15,12 +15,15 @@
 #include "./PCB.h"
 #include "./pcb_queue.h"
 #include "./pcb_vec.h"
+#include "./kernel_definition.h"
+
 
 #define NUM_PRIORITY_QUEUES 3
 
 // ============================ Global Variables ============================ // 
 extern volatile pid_t pid_count;
 extern volatile bool pennos_done;
+extern volatile k_errno_t k_errno;
 
 // set queues as global variable so that scheduler thread and other threads can access the queues
 extern pcb_queue_t priority_queue_array[NUM_PRIORITY_QUEUES]; 

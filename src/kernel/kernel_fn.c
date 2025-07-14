@@ -28,6 +28,7 @@
 
 volatile pid_t pid_count;
 volatile bool pennos_done;
+volatile k_errno_t k_errno;
 
 #define SHELL_THREAD_NAME "shell"
 #define INIT_THREAD_NAME "init"
@@ -87,9 +88,10 @@ void pennos_init() {
     pthread_sigmask(SIG_BLOCK, &sig_set_init, NULL);       
 
     pennos_done = false;    
+    k_errno = K_NOERROR;
 
-    // pid_count starts at 0 because init thread is the 1st thread
-    pid_count = 0;
+    // pid_count starts at 1 because init thread is the 1st thread
+    pid_count = 1;
 
     // initialize 3 Round Robin queues with different priority
     for (int i = 0; i < NUM_PRIORITY_QUEUES; i++) {
