@@ -369,8 +369,12 @@ void* rm(void* arg) {
   }
 
   for (int i = 1; argv[i]; ++i) {
-    if (s_unlink(argv[i]) != 0)
-      fprintf(stderr, "rm: cannot remove %s\n", argv[i]);
+    PennFatErr err = s_unlink(argv[i]);
+    if (err != 0) {
+      fprintf(stderr, "Error: rm failed for %s: %s\n", 
+              argv[i], PennFatErr_toErrString(err));
+              //Output to errostring
+    }
   }
   return NULL;
 }
