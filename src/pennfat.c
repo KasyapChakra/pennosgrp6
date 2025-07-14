@@ -159,7 +159,8 @@ int main(int argc, char* argv[]) {
 
       status = mv(args[1], args[2]);
       if (status) {
-        fprintf(stderr, "mv failed: %s\n", PennFatErr_toErrString(status));
+        fprintf(stderr, "Error renaming %s to %s: %s\n", args[1], args[2],
+                PennFatErr_toErrString(status));
       }
 
     } else if (strcmp(args[0], "rm") == 0) {
