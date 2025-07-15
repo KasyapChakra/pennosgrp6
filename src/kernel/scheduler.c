@@ -26,10 +26,7 @@
 
 const int queue_pick_pattern[QUEUE_PICK_PATTERN_LENGTH] = {0, 1, 0, 2, 1, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 1, 0, 2};
 
-volatile unsigned long g_ticks = 0;   // total number of 100-ms clock ticks since boot
-#define TICKS_INC() do { g_ticks++; } while(0)
-// Keep old symbol for now so we don’t have to touch every call-site at once
-#define cumulative_tick_global ((int)g_ticks)
+volatile int cumulative_tick_global = 0; // for DEBUG, can be deleted later ////////////////
 
 
 void handler_sigalrm_scheduler(int signum) {
@@ -88,28 +85,6 @@ void* thrd_scheduler_fn(void* arg) {
 
         for (int i = 0; i < arg_ptr->q_pick_pattern_len; i++) {  
 
-            /* one clock tick just occurred – update global counter */
-            spthread_disable_interrupts_self();
-            TICKS_INC();
-
-            /* move any sleepers whose wake_tick has arrived back to run queues */
-            size_t blk_len = queue_len(&blocked_queue);
-            for (size_t bi = 0; bi < blk_len; bi++) {
-                if (queue_is_empty(&blocked_queue)) break;
-                pcb_t* sleeper = queue_head(&blocked_queue);
-                if (sleeper->wake_tick <= g_ticks) {
-                    pcb_queue_pop(&blocked_queue);
-                    sleeper->status = THRD_RUNNING;
-                    pcb_queue_push(&priority_queue_array[sleeper->priority_level], sleeper);
-                    klog("[%5d]\tUNBLOCKED\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(sleeper), sleeper->priority_level);
-                } else {
-                    /* not ready – rotate to maintain fairness */
-                    pcb_queue_pop(&blocked_queue);
-                    pcb_queue_push(&blocked_queue, sleeper);
-                }
-            }
-            spthread_enable_interrupts_self();
-
             if (pennos_done) {
                 break;
             }
@@ -129,6 +104,7 @@ void* thrd_scheduler_fn(void* arg) {
 
                 ///////////////////////// for DEBUG /////////////////////////
                 spthread_disable_interrupts_self();
+                cumulative_tick_global = (cumulative_tick_global + 1) % 10000;
                 dprintf(STDERR_FILENO, "Scheduler tick on empty queues: # %d\n", cumulative_tick_global);        
                 spthread_enable_interrupts_self();
                 /////////////////////////////////////////////////////////////        
@@ -143,38 +119,10 @@ void* thrd_scheduler_fn(void* arg) {
             pcb_queue_t* curr_queue_ptr = &arg_ptr->q_array[arg_ptr->q_pick_pattern_array[i]];
             if (queue_is_empty(curr_queue_ptr)) {
                 spthread_enable_interrupts_self(); // protection OFF
+                sigsuspend(&sig_set_ex_sigalrm);
                 continue;
             }
-
-            /* Find the next runnable PCB in this queue.  
-             *   – THRD_RUNNING = choose it for execution
-             *   – THRD_STOPPED / THRD_BLOCKED = round-robin skip (pop & push)
-             *   – THRD_ZOMBIE = remove from queue entirely
-             */
-            size_t qlen = queue_len(curr_queue_ptr);
-            size_t tries = qlen;
-            curr_pcb_ptr = NULL;
-            while (tries-- > 0 && !queue_is_empty(curr_queue_ptr)) {
-                pcb_t* candidate = queue_head(curr_queue_ptr);
-                thrd_status_t st = thrd_status(candidate);
-                if (st == THRD_ZOMBIE) {
-                    /* discard zombies – they will be reaped elsewhere */
-                    pcb_queue_pop(curr_queue_ptr);
-                    continue;
-                }
-                if (st == THRD_RUNNING) {
-                    curr_pcb_ptr = candidate;
-                    break;
-                }
-                /* stopped or blocked – round-robin skip */
-                pcb_queue_pop(curr_queue_ptr);
-                pcb_queue_push(curr_queue_ptr, candidate);
-            }
-            if (curr_pcb_ptr == NULL) {
-                /* no runnable task found in this queue for this tick */
-                spthread_enable_interrupts_self(); // protection OFF
-                continue;
-            }
+            curr_pcb_ptr = queue_head(curr_queue_ptr);
             spthread_enable_interrupts_self(); // protection OFF
 
             spthread_continue(thrd_handle(curr_pcb_ptr));
@@ -191,14 +139,8 @@ void* thrd_scheduler_fn(void* arg) {
             spthread_suspend(thrd_handle(curr_pcb_ptr));
 
             spthread_disable_interrupts_self(); // protection ON
-            /* remove head (should be curr_pcb_ptr) */
-            pcb_queue_pop(curr_queue_ptr);
-            /* re-queue only if it is still runnable/eligible */
-            thrd_status_t post_status = thrd_status(curr_pcb_ptr);
-            if (post_status == THRD_RUNNING || post_status == THRD_STOPPED || post_status == THRD_BLOCKED) {
-                pcb_queue_push(curr_queue_ptr, curr_pcb_ptr);
-            }
-            /* if ZOMBIE – drop, it will be reaped later */
+            curr_pcb_ptr = pcb_queue_pop(curr_queue_ptr);
+            pcb_queue_push(curr_queue_ptr, curr_pcb_ptr);
             spthread_enable_interrupts_self(); // protection OFF
 
         }
