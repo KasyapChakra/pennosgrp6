@@ -13,9 +13,11 @@
 #include "./pcb_queue.h"
 #include "./pcb_vec.h"
 #include "./scheduler.h"
+#include "../user/shell.h"
 #include "../shell/shell.h"
 #include "./klogger.h"
 #include "../common/pennfat_errors.h"
+#include "../util/panic.h"
 
 #include <signal.h>
 #include <stdbool.h>
@@ -100,8 +102,21 @@ void pennos_init() {
 
     // initialize PCB vector to hold all unreaped PCBs
     all_unreaped_pcb_vector = pcb_vec_new(0, pcb_destroy); // need to be destroyed later
+
+    pcb_t* temp_pcb_ptr; 
+
+    // create a PCB for init thread and push it to pcb_vector
+    if (pcb_init_empty(&temp_pcb_ptr, QUEUE_PRIORITY_0, pid_count++) == -1) {
+        panic("pcb_init() failed!\n");
+    }    
+    temp_pcb_ptr->command = INIT_THREAD_NAME;
+    temp_pcb_ptr->status = THRD_RUNNING;
+    // push to pcb_vec just for ps command to show init thread
+    k_register_pcb(temp_pcb_ptr); 
+
+
     
-    // set up and start scheduler thread
+    // set up and start scheduler thread (scheduler does not need a PCB)
     spthread_t thrd_scheduler;
     scheduler_para_t new_scheduler_para = (scheduler_para_t) {
         .num_queues = NUM_PRIORITY_QUEUES,
@@ -111,18 +126,16 @@ void pennos_init() {
         .quantum_msec = 100,
     };    
     spthread_create(&thrd_scheduler, NULL, thrd_scheduler_fn, &new_scheduler_para);    
-    pid_count++;
+    // pid_count++; // scheduler does not need a PCB as it doesn't show up in ps
     spthread_continue(thrd_scheduler); // start scheduler thread
 
-    pcb_t* temp_pcb_ptr; 
     
     // start shell thread
     spthread_t thrd_shell;
-    spthread_create(&thrd_shell, NULL, thrd_shell_fn, NULL);    
-    pid_count++;    
-    pcb_init(thrd_shell, &temp_pcb_ptr, QUEUE_PRIORITY_0, pid_count, SHELL_THREAD_NAME);
+    spthread_create(&thrd_shell, NULL, thrd_shell_fn, NULL);        
+    pcb_init(thrd_shell, &temp_pcb_ptr, QUEUE_PRIORITY_0, pid_count++, SHELL_THREAD_NAME);
     pcb_queue_push(&priority_queue_array[QUEUE_PRIORITY_0], temp_pcb_ptr);
-    k_register_pcb(temp_pcb_ptr);
+    k_register_pcb(temp_pcb_ptr); // push to pcb_vec
         
 
 
@@ -134,23 +147,20 @@ void pennos_init() {
     spthread_t temp_spthread;  
 
     // test thread for queue 0
-    spthread_create(&temp_spthread, NULL, thrd_print_p0, NULL);
-    pid_count++;
-    pcb_init(temp_spthread, &temp_pcb_ptr, 0, pid_count, "Test1");
+    spthread_create(&temp_spthread, NULL, thrd_print_p0, NULL);    
+    pcb_init(temp_spthread, &temp_pcb_ptr, 0, pid_count++, "Test1");
     pcb_queue_push(&priority_queue_array[0], temp_pcb_ptr);
     k_register_pcb(temp_pcb_ptr);
        
     // test thread for queue 1
-    spthread_create(&temp_spthread, NULL, thrd_print_p1, NULL);
-    pid_count++;
-    pcb_init(temp_spthread, &temp_pcb_ptr, 1, pid_count, "Test2");
+    spthread_create(&temp_spthread, NULL, thrd_print_p1, NULL);    
+    pcb_init(temp_spthread, &temp_pcb_ptr, 1, pid_count++, "Test2");
     pcb_queue_push(&priority_queue_array[1], temp_pcb_ptr);
     k_register_pcb(temp_pcb_ptr);
         
     // test thread for queue 2
-    spthread_create(&temp_spthread, NULL, thrd_print_p2, NULL);
-    pid_count++;
-    pcb_init(temp_spthread, &temp_pcb_ptr, 2, pid_count, "Test3");  
+    spthread_create(&temp_spthread, NULL, thrd_print_p2, NULL);    
+    pcb_init(temp_spthread, &temp_pcb_ptr, 2, pid_count++, "Test3");  
     pcb_queue_push(&priority_queue_array[2], temp_pcb_ptr);      
     k_register_pcb(temp_pcb_ptr);
 
@@ -158,6 +168,9 @@ void pennos_init() {
     print_queue_info(&priority_queue_array[0]);
     print_queue_info(&priority_queue_array[1]);
     print_queue_info(&priority_queue_array[2]);   
+
+    //dprintf(STDERR_FILENO, "\n\n\n");
+    //print_pcb_vec_info(&all_unreaped_pcb_vector);
     
 
 

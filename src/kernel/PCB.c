@@ -13,25 +13,22 @@
 #include <unistd.h> // for STDERR_FILENO
 
 
-
-int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid, 
-             char* command) {
+int pcb_init_empty(pcb_t** result_pcb, int priority_code, pid_t pid) {
 
     pcb_t* temp_pcb_ptr = calloc(1, sizeof(pcb_t));
     if (temp_pcb_ptr == NULL) {
         // calloc() failed
+        perror("pcb_init() memory allocation failed");
         return -1;
     }
 
-    // --- ID ---
-    temp_pcb_ptr->thrd = thread;
+    // --- ID ---    
     temp_pcb_ptr->pid = pid;
-    temp_pcb_ptr->pgid = 0;
+    temp_pcb_ptr->pgid = pid;
     temp_pcb_ptr->ppid = 0;
 
     // --- attributes ---
-    temp_pcb_ptr->priority_level = priority_code;
-    temp_pcb_ptr->command = command;    
+    temp_pcb_ptr->priority_level = priority_code;     
 
     // --- child info ---
     temp_pcb_ptr->num_child_pids = 0;    
@@ -50,8 +47,20 @@ int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid
     // --- others (to be decided) ---
     temp_pcb_ptr->fds = NULL;
 
-
     *result_pcb = temp_pcb_ptr;
+    return 0;
+}
+
+
+int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid, 
+             char* command) {
+
+    if (pcb_init_empty(result_pcb, priority_code, pid) == -1) {
+        return -1;
+    }
+    
+    (*result_pcb)->thrd = thread;
+    (*result_pcb)->command = command; 
     return 0;
 }
 
@@ -89,11 +98,13 @@ void reset_pcb_status_signal(pcb_t* pcb_ptr) {
 
 void print_pcb_info(pcb_t* self_ptr) {
     dprintf(STDERR_FILENO, "\t------ Print PCB info ------\n");
-    dprintf(STDERR_FILENO, "\tThread Status: %d\n", thrd_status(self_ptr));
-    dprintf(STDERR_FILENO, "\tThread Priority Level: %d\n", thrd_priority(self_ptr));
     dprintf(STDERR_FILENO, "\tThread PID: %d\n", thrd_pid(self_ptr));
     dprintf(STDERR_FILENO, "\tThread PGID: %d\n", thrd_pgid(self_ptr));
-    dprintf(STDERR_FILENO, "\tThread parent PID: %d\n\n", thrd_ppid(self_ptr));
+    dprintf(STDERR_FILENO, "\tThread PPID: %d\n", thrd_ppid(self_ptr));    
+    dprintf(STDERR_FILENO, "\tThread Priority Level: %d\n", thrd_priority(self_ptr));    
+    dprintf(STDERR_FILENO, "\tThread command: %s\n", self_ptr->command);    
+    dprintf(STDERR_FILENO, "\tThread Status: %d\n\n", thrd_status(self_ptr));
+
 }
 
 

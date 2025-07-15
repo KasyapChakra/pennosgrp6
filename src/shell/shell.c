@@ -208,6 +208,8 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
             s_spawn(zombify, NULL, -1, -1);
         } else if (strcmp(tok, "orphanify") == 0) {
             s_spawn(orphanify, NULL, -1, -1);
+        } else if (strcmp(tok, "pcbvec") == 0) {
+            print_pcb_vec_info(&all_unreaped_pcb_vector);
         } else {
             dprintf(STDERR_FILENO, "unknown command: %s\n", tok);
         }

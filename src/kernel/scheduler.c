@@ -13,6 +13,7 @@
 #include "./pcb_queue.h"
 #include "./kernel_fn.h"
 #include "./klogger.h"
+#include "./kernel_definition.h"
 
 #include <signal.h>
 #include <stdbool.h>
@@ -122,9 +123,13 @@ void* thrd_scheduler_fn(void* arg) {
                 continue;
             }
             curr_pcb_ptr = queue_head(curr_queue_ptr);
+            // this pcb status should be STOPPED at this point
+            curr_pcb_ptr->status = THRD_RUNNING;
+            curr_pcb_ptr->cont_signal = P_SIGCONT;
+            spthread_continue(thrd_handle(curr_pcb_ptr));
             spthread_enable_interrupts_self(); // protection OFF
 
-            spthread_continue(thrd_handle(curr_pcb_ptr));
+
             klog("[%5d]\tSCHEDULE\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(curr_pcb_ptr), queue_type(curr_queue_ptr));
             
             ///////////////////////// for DEBUG /////////////////////////
@@ -134,10 +139,12 @@ void* thrd_scheduler_fn(void* arg) {
             // spthread_enable_interrupts_self();
             /////////////////////////////////////////////////////////////     
 
-            sigsuspend(&sig_set_ex_sigalrm);            
-            spthread_suspend(thrd_handle(curr_pcb_ptr));
+            sigsuspend(&sig_set_ex_sigalrm);    
 
-            spthread_disable_interrupts_self(); // protection ON
+            spthread_disable_interrupts_self(); // protection ON                    
+            spthread_suspend(thrd_handle(curr_pcb_ptr));
+            curr_pcb_ptr->status = THRD_STOPPED;
+            curr_pcb_ptr->stop_signal = P_SIGSTOP;
             curr_pcb_ptr = pcb_queue_pop(curr_queue_ptr);
             pcb_queue_push(curr_queue_ptr, curr_pcb_ptr);
             spthread_enable_interrupts_self(); // protection OFF

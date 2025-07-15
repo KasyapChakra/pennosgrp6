@@ -126,25 +126,14 @@ pcb_t* k_proc_create(pcb_t* parent, int priority_code) {
 */
 
 pcb_t* k_proc_create(pcb_t* parent_pcb_ptr, int priority_code) {
-    pcb_t* pcb_ptr = calloc(1, sizeof(pcb_t));
-    if (pcb_ptr == NULL) {
-        return NULL;
-    }
-
-    pcb_ptr->status = THRD_STOPPED;
-    pcb_ptr->pre_status = THRD_STOPPED;
-    pcb_ptr->priority_level = priority_code;
-
-    // assign fresh pid (shared global from kernel_fn.c)
+    pcb_t* pcb_ptr;
     spthread_disable_interrupts_self();
     pid_count++;    
-    pcb_ptr->pid = pid_count;
-    spthread_enable_interrupts_self();
-    pcb_ptr->pgid = pcb_ptr->pid;
+    if (pcb_init_empty(&pcb_ptr, priority_code, pid_count) == -1) {
+        panic("pcb_init() failed!\n");
+    }
+    spthread_enable_interrupts_self();    
     pcb_ptr->ppid = parent_pcb_ptr ? thrd_pid(parent_pcb_ptr) : 0;
-    pcb_ptr->num_child_pids = 0;    
-    pcb_ptr->fds = NULL;
-    pcb_ptr->next_pcb_ptr = NULL;    
 
     // thread will be assigned later by k_set_routine_and_run    
     pcb_vec_push_back(&all_unreaped_pcb_vector, pcb_ptr);

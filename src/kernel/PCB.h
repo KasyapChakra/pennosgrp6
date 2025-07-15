@@ -82,6 +82,8 @@ typedef struct pcb_st {
 int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid, 
              char* command);
 
+int pcb_init_empty(pcb_t** result_pcb, int priority_code, pid_t pid);
+
 /**
  * This function destroys a PCB, freeing its resources when it is no longer needed.
  * 
