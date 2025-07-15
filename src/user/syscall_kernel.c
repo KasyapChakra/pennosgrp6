@@ -2,7 +2,6 @@
 #include "syscall_kernel.h"
 #include "../kernel/PCB.h"
 #include "../kernel/kernel_fn.h"
-//#include "../internal/pennfat_kernel.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>  // dup2, close
@@ -22,7 +21,7 @@ typedef struct spawn_wrapper_arg {
   int fd1;
 } spawn_wrapper_arg;
 
-/* runs in the CHILD ─ before user “func” */
+/* runs in the CHILD ─ before user "func" */
 void* spawn_entry_wrapper(void* raw) {
   spawn_wrapper_arg* wrap = (spawn_wrapper_arg*)raw;
 
@@ -54,7 +53,9 @@ pid_t s_spawn(void* (*func)(void*), char* argv[], int fd0, int fd1) {
   pcb_t* parent = k_get_self_pcb();
   assert_non_null(parent, "s_spawn: parent missing");
 
-  pcb_t* child = k_proc_create(parent, 0);
+  /* Use parent's priority by default */
+  int priority = parent->priority_level;
+  pcb_t* child = k_proc_create(parent, priority);
   if (!child) {
     errno = EAGAIN;
     return -1;
@@ -109,14 +110,12 @@ int s_tcsetpid(pid_t pid) {
 }
 
 pid_t s_getselfpid() {
-  pid_t self = k_get_pid(k_get_self_pcb());
-
-  if (self <= 0) {
-    // TODO: errno
+  pcb_t* self = k_get_self_pcb();
+  if (!self) {
+    errno = ESRCH;
     return -1;
   }
-
-  return self;
+  return k_get_pid(self);
 }
 
 void s_printprocess(void) {
@@ -128,11 +127,10 @@ void s_exit(void) {
 }
 
 int s_nice(pid_t pid, int priority) {
-  if (priority >= 3) {  // PRIORITY_COUNT
-    // TODO: set errno
+  if (priority < 0 || priority >= 3) {  // PRIORITY_COUNT from kernel_fn.c
+    errno = EINVAL;
     return -1;
   }
-
   return k_nice(pid, priority);
 }
 
@@ -184,6 +182,7 @@ PennFatErr s_close(int fd) {
 PennFatErr s_read(int fd, int n, char* b) {
   return k_read(fd, n, b);
 }
+
 PennFatErr s_write(int fd, const char* b, int n) {
   return k_write(fd, b, n);
 }
@@ -191,9 +190,11 @@ PennFatErr s_write(int fd, const char* b, int n) {
 PennFatErr s_touch(const char* p) {
   return k_touch(p);
 }
+
 PennFatErr s_ls(const char* p) {
   return k_ls(p);
 }
+
 PennFatErr s_chmod(const char* p, uint8_t perm) {
   return k_chmod(p, perm);
 }
@@ -215,3 +216,4 @@ int s_unlink(const char* p) {
   }
   return 0;
 }
+
