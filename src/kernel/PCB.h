@@ -44,11 +44,11 @@ typedef struct pcb_st {
 
     // --- status related ---
     thrd_status_t status; // 0 (running) | 1 (stopped) | 2 (blocked) | 3 (zombie)
-    bool status_changed;    // still false if status changed to BLOCKED or RUNNING
-                            // only set true if status changed to STOPPED or ZOMBIE
+    thrd_status_t pre_status; // only to be modified by waitpid()
     int exit_code;
     k_signal_t term_signal;
     k_signal_t stop_signal;
+    k_signal_t cont_signal;
 
     // --- others (to be decided) ---
     int* fds; // array of file descriptors
@@ -58,16 +58,17 @@ typedef struct pcb_st {
 
 // ========================= Functions-like macros ========================= //
 #define thrd_handle(pcb_ptr) ((pcb_ptr)->thrd)
-#define thrd_status(pcb_ptr) ((pcb_ptr)->status)
-#define thrd_pre_status(pcb_ptr) ((pcb_ptr)->pre_status)
-#define thrd_is_status_change(pcb_ptr) ((pcb_ptr)->status_changed)
-#define thrd_priority(pcb_ptr) ((pcb_ptr)->priority_level)
 #define thrd_pid(pcb_ptr) ((pcb_ptr)->pid)
 #define thrd_pgid(pcb_ptr) ((pcb_ptr)->pgid)
 #define thrd_ppid(pcb_ptr) ((pcb_ptr)->ppid)
+#define thrd_priority(pcb_ptr) ((pcb_ptr)->priority_level)
+#define thrd_CMD(pcb_ptr) ((pcb_ptr)->command)
 #define thrd_num_child(pct_ptr) ((pcb_ptr)->num_child_pids)
 #define thrd_next(pcb_ptr) ((pcb_ptr)->next_pcb_ptr)
-#define thrd_CMD(pcb_ptr) ((pcb_ptr)->command)
+
+#define thrd_status(pcb_ptr) ((pcb_ptr)->status)
+#define thrd_pre_status(pcb_ptr) ((pcb_ptr)->pre_status)
+
 
 // ============================ Functions ============================ //
 /** 
@@ -95,5 +96,12 @@ void pcb_destroy(pcb_t* self_ptr);
  * @param self_ptr Pointer to the PCB whose information will be printed.
  */
 void print_pcb_info(pcb_t* self_ptr);
+
+
+// change between RUNNING and BLOCKED does NOT count as change
+bool is_thrd_status_changed(pcb_t* pcb_ptr);
+
+void reset_pcb_status_signal(pcb_t* pcb_ptr);
+
 
 #endif  // PCB_H_

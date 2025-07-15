@@ -27,15 +27,16 @@ typedef enum {
 
 
 // exit normally
-#define P_WIFEXITED(wstatus)     (((wstatus) & 0x7F) == 0) // returns true if exited normally (bit 0-6 all ZEROs)
-#define P_WEXITSTATUS(wstatus)   (((wstatus) >> 8) & 0xFF) // returns exit code for a thread exited normally (bit 8-15)
+#define P_WIFEXITED(wstatus)    (((wstatus) & 0x7F) == 0) // returns true if exited normally (bit 0-6 all ZEROs)
+#define P_WEXITSTATUS(wstatus)  (((wstatus) >> 8) & 0xFF) // returns exit code for a thread exited normally (bit 8-15)
 // terminated by signal
-#define P_WIFSIGNALED(wstatus)   (((wstatus) & 0x7F) != 0 && ((wstatus) & 0x7F) != 0x7F) // returns true if terminated by a signal (bit 0-6 neither all ZEROs nor all ONEs)
-#define P_WTERMSIG(wstatus)      ((wstatus) & 0x7F) // returns signal number that caused the termination (bit 0-6)
+#define P_WIFSIGNALED(wstatus)  (((wstatus) & 0x7F) != 0 && ((wstatus) & 0x7F) != 0x7F) // returns true if terminated by a signal (bit 0-6 neither all ZEROs nor all ONEs)
+#define P_WTERMSIG(wstatus)     ((wstatus) & 0x7F) // returns signal number that caused the termination (bit 0-6)
 // stopped
-#define P_WIFSTOPPED(wstatus)    (((wstatus) & 0xFF) == 0x7F) // returns true if the thread was stopped (bit 0-6 all ONEs)
-#define P_WSTOPSIG(wstatus)      (((wstatus) >> 8) & 0xFF) // returns the signal number that causes the stop (bit 8-15)
-
+#define P_WIFSTOPPED(wstatus)   (((wstatus) & 0xFF) == 0x7F) // returns true if the thread was stopped (bit 0-6 all ONEs)
+#define P_WSTOPSIG(wstatus)     (((wstatus) >> 8) & 0xFF) // returns the signal number that causes the stop (bit 8-15)
+// continued
+#define P_WIFCONTINUED(wstatus) ((wstatus) == 0xFFFF) // returns true if the thread was continued (bit 0-15 all ONEs)
 
 
 

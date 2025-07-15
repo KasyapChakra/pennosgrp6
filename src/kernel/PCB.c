@@ -41,10 +41,11 @@ int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid
 
     // --- status related ---
     temp_pcb_ptr->status = THRD_STOPPED;
-    temp_pcb_ptr->status_changed = false;
+    temp_pcb_ptr->pre_status = thrd_status(temp_pcb_ptr);    
     temp_pcb_ptr->exit_code = 0;
     temp_pcb_ptr->term_signal = 0;
     temp_pcb_ptr->stop_signal = 0;
+    temp_pcb_ptr->cont_signal = 0;
 
     // --- others (to be decided) ---
     temp_pcb_ptr->fds = NULL;
@@ -60,6 +61,31 @@ void pcb_destroy(pcb_t* self_ptr) {
     free(self_ptr);
     self_ptr = NULL;
 }
+
+
+bool is_thrd_status_changed(pcb_t* pcb_ptr) {  
+    if ((thrd_status(pcb_ptr) == THRD_STOPPED) || (thrd_status(pcb_ptr) == THRD_ZOMBIE)) {
+        return (thrd_status(pcb_ptr) == thrd_pre_status(pcb_ptr));
+    }
+
+    // thread status is now either RUNNING or BLOCKED
+    // -- change between RUNNING and BLOCKED does NOT count as change
+    // -- change from STOPPED to RUNNING/BLOCKED only counts if there is SIGCONT    
+    if ((thrd_pre_status(pcb_ptr) == THRD_STOPPED) && (pcb_ptr->cont_signal == P_SIGCONT)) {
+        return true;
+    } 
+
+    return false;    
+}
+
+void reset_pcb_status_signal(pcb_t* pcb_ptr) {
+    pcb_ptr->pre_status = thrd_status(pcb_ptr);
+    pcb_ptr->exit_code = 0;
+    pcb_ptr->term_signal = 0;
+    pcb_ptr->stop_signal = 0;
+    pcb_ptr->cont_signal = 0;
+}
+
 
 void print_pcb_info(pcb_t* self_ptr) {
     dprintf(STDERR_FILENO, "\t------ Print PCB info ------\n");

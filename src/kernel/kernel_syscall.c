@@ -132,6 +132,7 @@ pcb_t* k_proc_create(pcb_t* parent_pcb_ptr, int priority_code) {
     }
 
     pcb_ptr->status = THRD_STOPPED;
+    pcb_ptr->pre_status = THRD_STOPPED;
     pcb_ptr->priority_level = priority_code;
 
     // assign fresh pid (shared global from kernel_fn.c)
@@ -302,12 +303,13 @@ pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
 */
 
 pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
+    // the functions acts as if waitpid with both WUNTRACED and WCONTINUED flags
+
     pcb_t* self_pcb_ptr = k_get_self_pcb();
     if (self_pcb_ptr == NULL) {
         return -1;
     }
-
-    // not finished, need to complete //////debug    
+    
     while (true) {
         bool no_target_child = true; // relevent for ECHILD
         bool no_update = true; // relevant for NOHANG
@@ -319,43 +321,54 @@ pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
             if (is_child && pid_match) {
                 no_target_child = false;
 
-                if (!thrd_is_status_change(curr_pcb_ptr)) {
+                if (!is_thrd_status_changed(curr_pcb_ptr)) {
                     continue;
                 }
 
-                no_update = false;
+                no_update = false;                         
 
                 if (thrd_status(curr_pcb_ptr) == THRD_STOPPED) {
                     if (curr_pcb_ptr->stop_signal != P_SIGSTOP) {
                         panic("Thread was stopped but not by P_SIGSTOP!\n");
                     }
-                    *wstatus = (curr_pcb_ptr->stop_signal << 8) | 0x7F;                    
+                    *wstatus = (curr_pcb_ptr->stop_signal << 8) | 0x7F; 
+                    reset_pcb_status_signal(curr_pcb_ptr);           
                     return thrd_pid(curr_pcb_ptr);
                 }
 
                 if (thrd_status(curr_pcb_ptr) == THRD_ZOMBIE) {
                     if (curr_pcb_ptr->term_signal == 0) {
                         // exited normally
-                        *wstatus = curr_pcb_ptr->exit_code << 8;                        
+                        *wstatus = curr_pcb_ptr->exit_code << 8; 
+                        reset_pcb_status_signal(curr_pcb_ptr);            
                     } else {
                         // terminated by signal
                         if (curr_pcb_ptr->term_signal != P_SIGTERM) {
                             panic("Thread was terminated but not by P_SIGTERM!\n");
                         }
                         *wstatus = curr_pcb_ptr->term_signal;
-                    }                    
-                    pid_t result_pid = thrd_pid(curr_pcb_ptr);
+                        reset_pcb_status_signal(curr_pcb_ptr); 
+                    }              
+                    
+                    pid_t result_pid = thrd_pid(curr_pcb_ptr);                    
 
                     // pop up the pcb and clear it
+                    /////////////////////////////////////////
+                    /////////////////////////////////////////
+                    /////////////////////////////////////////
 
                     return result_pid;
                 }
-
-                // can implement WIFCONTINUED if needed
-
-                curr_pcb_ptr->status_changed = false;                
+                            
+                if ((thrd_status(curr_pcb_ptr) == THRD_RUNNING) || (thrd_status(curr_pcb_ptr) == THRD_BLOCKED)) {
+                    if (curr_pcb_ptr->cont_signal != P_SIGCONT) {
+                        panic("Thread was continued but not by P_SIGCONT!\n");
+                    }
+                    *wstatus = 0xFFFF; 
+                    reset_pcb_status_signal(curr_pcb_ptr);           
+                    return thrd_pid(curr_pcb_ptr);
+                }  
             }
-
         }
 
         if (no_target_child) {
