@@ -134,28 +134,28 @@ void pennos_init() {
     
     // test threads for the 3 queues
     
-    spthread_t temp_spthread;  
+    // spthread_t temp_spthread;  
 
-    // test thread for queue 0
-    spthread_create(&temp_spthread, NULL, thrd_print_p0, NULL);
-    pid_count++;
-    pcb_init(temp_spthread, &temp_pcb_ptr, 0, pid_count, "Test1");
-    pcb_queue_push(&priority_queue_array[0], temp_pcb_ptr);
-    k_register_pcb(temp_pcb_ptr);
+    // // test thread for queue 0
+    // spthread_create(&temp_spthread, NULL, thrd_print_p0, NULL);
+    // pid_count++;
+    // pcb_init(temp_spthread, &temp_pcb_ptr, 0, pid_count, "Test1");
+    // pcb_queue_push(&priority_queue_array[0], temp_pcb_ptr);
+    // k_register_pcb(temp_pcb_ptr);
        
-    // test thread for queue 1
-    spthread_create(&temp_spthread, NULL, thrd_print_p1, NULL);
-    pid_count++;
-    pcb_init(temp_spthread, &temp_pcb_ptr, 1, pid_count, "Test2");
-    pcb_queue_push(&priority_queue_array[1], temp_pcb_ptr);
-    k_register_pcb(temp_pcb_ptr);
+    // // test thread for queue 1
+    // spthread_create(&temp_spthread, NULL, thrd_print_p1, NULL);
+    // pid_count++;
+    // pcb_init(temp_spthread, &temp_pcb_ptr, 1, pid_count, "Test2");
+    // pcb_queue_push(&priority_queue_array[1], temp_pcb_ptr);
+    // k_register_pcb(temp_pcb_ptr);
         
-    // test thread for queue 2
-    spthread_create(&temp_spthread, NULL, thrd_print_p2, NULL);
-    pid_count++;
-    pcb_init(temp_spthread, &temp_pcb_ptr, 2, pid_count, "Test3");  
-    pcb_queue_push(&priority_queue_array[2], temp_pcb_ptr);      
-    k_register_pcb(temp_pcb_ptr);
+    // // test thread for queue 2
+    // spthread_create(&temp_spthread, NULL, thrd_print_p2, NULL);
+    // pid_count++;
+    // pcb_init(temp_spthread, &temp_pcb_ptr, 2, pid_count, "Test3");  
+    // pcb_queue_push(&priority_queue_array[2], temp_pcb_ptr);      
+    // k_register_pcb(temp_pcb_ptr);
 
     // print info for the 3 queues for debug ///////////////////
     print_queue_info(&priority_queue_array[0]);
@@ -163,13 +163,11 @@ void pennos_init() {
     print_queue_info(&priority_queue_array[2]);   
 
 
-
     ///////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////  
 
     spthread_join(thrd_scheduler, NULL); // wait for scheduler thread to join
 
-    
 
     // clean up
     for (int i = 0; i < NUM_PRIORITY_QUEUES; i++) {    

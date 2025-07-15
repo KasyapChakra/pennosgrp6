@@ -48,6 +48,7 @@ void pcb_destroy(pcb_t* self_ptr) {
 
 void print_pcb_info(pcb_t* self_ptr) {
     dprintf(STDERR_FILENO, "\t------ Print PCB info ------\n");
+    dprintf(STDERR_FILENO, "\tThread CMD: %s\n", thrd_CMD(self_ptr));
     dprintf(STDERR_FILENO, "\tThread Status: %d\n", thrd_status(self_ptr));
     dprintf(STDERR_FILENO, "\tThread Priority Level: %d\n", thrd_priority(self_ptr));
     dprintf(STDERR_FILENO, "\tThread PID: %d\n", thrd_pid(self_ptr));
