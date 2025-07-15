@@ -78,22 +78,12 @@ void cancel_and_join_thrd(spthread_t thread) {
     spthread_join(thread, NULL);
 }
 
-
-void pennos_init() {
-
-    // block SIGALRM | SIGINT | SIGTSTP (the mask is inherited by all child threads)
-    sigset_t sig_set_init;
-    sigemptyset(&sig_set_init);
-    sigaddset(&sig_set_init, SIGALRM);
-    sigaddset(&sig_set_init, SIGINT);
-    sigaddset(&sig_set_init, SIGTSTP);
-    pthread_sigmask(SIG_BLOCK, &sig_set_init, NULL);       
-
-    pennos_done = false;    
-    k_errno = P_NOERROR;
+void pennos_kernel(void) {
+    pennos_done = false;   
+    k_errno = P_NOERROR;    
 
     // pid_count starts at 1 because init thread is the 1st thread
-    pid_count = 1;
+    pid_count = 1;    
 
     // initialize 3 Round Robin queues with different priority
     for (int i = 0; i < NUM_PRIORITY_QUEUES; i++) {
@@ -101,40 +91,73 @@ void pennos_init() {
     }  
 
     // initialize PCB vector to hold all unreaped PCBs
-    all_unreaped_pcb_vector = pcb_vec_new(0, pcb_destroy); // need to be destroyed later
-
+    all_unreaped_pcb_vector = pcb_vec_new(0, pcb_destroy); // need to be destroyed later 
+    
     pcb_t* temp_pcb_ptr; 
 
-    // create a PCB for init thread and push it to pcb_vector
-    if (pcb_init_empty(&temp_pcb_ptr, QUEUE_PRIORITY_0, pid_count++) == -1) {
+    // ------ set up init thread ------ //
+    spthread_t thrd_init;
+    spthread_create(&thrd_init, NULL, thrd_init_fn, NULL);        
+    if (pcb_init(thrd_init, &temp_pcb_ptr, QUEUE_PRIORITY_0, pid_count++, INIT_THREAD_NAME) == -1) {
         panic("pcb_init() failed!\n");
-    }    
-    temp_pcb_ptr->command = INIT_THREAD_NAME;
-    temp_pcb_ptr->status = THRD_RUNNING;
-    // push to pcb_vec just for ps command to show init thread
-    k_register_pcb(temp_pcb_ptr); 
+    }
+    pcb_queue_push(&priority_queue_array[QUEUE_PRIORITY_0], temp_pcb_ptr); // push to priority queue
+    k_register_pcb(temp_pcb_ptr); // push to pcb vector
 
 
-    
-    // set up and start scheduler thread (scheduler does not need a PCB)
-    spthread_t thrd_scheduler;
+    // ------ set up and run scheduler function ------ //    
     scheduler_para_t new_scheduler_para = (scheduler_para_t) {
         .num_queues = NUM_PRIORITY_QUEUES,
         .q_array = priority_queue_array,
         .q_pick_pattern_len = QUEUE_PICK_PATTERN_LENGTH,
         .q_pick_pattern_array = queue_pick_pattern,
         .quantum_msec = 100,
-    };    
-    spthread_create(&thrd_scheduler, NULL, thrd_scheduler_fn, &new_scheduler_para);    
-    // pid_count++; // scheduler does not need a PCB as it doesn't show up in ps
-    spthread_continue(thrd_scheduler); // start scheduler thread
+    };  
+    scheduler_fn(&new_scheduler_para);
+    spthread_continue(thrd_init); // make sure thread init is not suspended
 
+    // scheduler running ...
+    // ...
+    // till shell user exit by ctrl-D    
+
+    spthread_join(thrd_init, NULL); // wait for init thread to join
+
+
+    pcb_vec_destroy(&all_unreaped_pcb_vector);
+
+    // for debug ///////////////////////
+    dprintf(STDERR_FILENO, "Final total tick: # %d\n", cumulative_tick_global);  
+    dprintf(STDERR_FILENO, "\tFinal count for queue 0: # %d\n", count_p0);  
+    dprintf(STDERR_FILENO, "\tFinal count for queue 1: # %d\n", count_p1);  
+    dprintf(STDERR_FILENO, "\tFinal count for queue 2: # %d\n", count_p2);  
+    dprintf(STDERR_FILENO, "\tFinal queue 0 / queue 1: # %f\n", (float) count_p0 / count_p1);  
+    dprintf(STDERR_FILENO, "\tFinal queue 1 / queue 2: # %f\n", (float) count_p1 / count_p2);  
+    dprintf(STDERR_FILENO, "\tFinal queue 0 / queue 2: # %f\n", (float) count_p0 / count_p2);  
+
+    dprintf(STDERR_FILENO, "########## PennOS exit ##########\n");
+
+    exit(EXIT_SUCCESS);
+}
+
+void* thrd_init_fn([[maybe_unused]] void* arg) {
+
+    // block SIGALRM | SIGINT | SIGTSTP (the mask is inherited by all child threads)
+    sigset_t sig_set_init;
+    sigemptyset(&sig_set_init);
+    sigaddset(&sig_set_init, SIGALRM);
+    sigaddset(&sig_set_init, SIGINT);
+    sigaddset(&sig_set_init, SIGTSTP);
+    pthread_sigmask(SIG_BLOCK, &sig_set_init, NULL);   
+
+    pcb_t* temp_pcb_ptr;
     
-    // start shell thread
+    // ------ set up shell thread ------ //
     spthread_t thrd_shell;
     spthread_create(&thrd_shell, NULL, thrd_shell_fn, NULL);        
-    pcb_init(thrd_shell, &temp_pcb_ptr, QUEUE_PRIORITY_0, pid_count++, SHELL_THREAD_NAME);
-    pcb_queue_push(&priority_queue_array[QUEUE_PRIORITY_0], temp_pcb_ptr);
+    if (pcb_init(thrd_shell, &temp_pcb_ptr, QUEUE_PRIORITY_0, pid_count++, SHELL_THREAD_NAME) == -1) {
+        panic("pcb_init() failed!\n");
+    }    
+    pcb_queue_push(&priority_queue_array[QUEUE_PRIORITY_0], temp_pcb_ptr); // push to priority queue
     k_register_pcb(temp_pcb_ptr); // push to pcb_vec
         
 
@@ -169,19 +192,25 @@ void pennos_init() {
     print_queue_info(&priority_queue_array[1]);
     print_queue_info(&priority_queue_array[2]);   
 
-    //dprintf(STDERR_FILENO, "\n\n\n");
-    //print_pcb_vec_info(&all_unreaped_pcb_vector);
-    
-
 
     ///////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////  
 
 
-    spthread_join(thrd_scheduler, NULL); // wait for scheduler thread to join
+    pcb_t* self_pcb_ptr = k_get_self_pcb();
+    self_pcb_ptr->status = THRD_BLOCKED; // modify self status to BLOCKED as it will block and wait for shell to join
+    spthread_join(thrd_shell, NULL); // wait for shell thread to join
+    self_pcb_ptr->status = THRD_RUNNING; // modify self status to RUNNING as shell thread has joined
 
+
+    // clean up
+    // cancel and join all PCBs in pcb vector
+    // starts with i = 2, because init at i = 0 and shell at i = 1
+    for (int i = 2; i < pcb_vec_len(&all_unreaped_pcb_vector); i++) {
+        cancel_and_join_pcb((&all_unreaped_pcb_vector)->pcb_ptr_array[i]);
+    }
     
-
+    /*
     // clean up
     for (int i = 0; i < NUM_PRIORITY_QUEUES; i++) {    
 
@@ -194,18 +223,12 @@ void pennos_init() {
         }    
         pcb_queue_destroy(&priority_queue_array[i]); 
     }  
-    
-    pcb_vec_destroy(&all_unreaped_pcb_vector);
-    
+    */
 
-    dprintf(STDERR_FILENO, "Final total tick: # %d\n", cumulative_tick_global);  
-    dprintf(STDERR_FILENO, "\tFinal count for queue 0: # %d\n", count_p0);  
-    dprintf(STDERR_FILENO, "\tFinal count for queue 1: # %d\n", count_p1);  
-    dprintf(STDERR_FILENO, "\tFinal count for queue 2: # %d\n", count_p2);  
-    dprintf(STDERR_FILENO, "\tFinal queue 0 / queue 1: # %f\n", (float) count_p0 / count_p1);  
-    dprintf(STDERR_FILENO, "\tFinal queue 1 / queue 2: # %f\n", (float) count_p1 / count_p2);  
-    dprintf(STDERR_FILENO, "\tFinal queue 0 / queue 2: # %f\n", (float) count_p0 / count_p2);  
+    dprintf(STDERR_FILENO, "~~~~~~~~~~ Init thread exit ~~~~~~~~~~\n");
 
+    spthread_exit(NULL);
+    return NULL;    
 }
 
 

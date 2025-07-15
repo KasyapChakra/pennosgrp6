@@ -300,4 +300,6 @@ pcb_t* pcb_vec_seek_pcb_by_thrd(pcb_vec_t* self, pthread_t thrd);
 
 void print_pcb_vec_info(pcb_vec_t* self);
 
+void ps_print_pcb_vec_info(pcb_vec_t* self);
+
 #endif  // PCB_VEC_H_

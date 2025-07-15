@@ -227,3 +227,12 @@ void print_pcb_vec_info(pcb_vec_t* self) {
 }
 
 
+void ps_print_pcb_vec_info(pcb_vec_t* self) {
+  dprintf(STDERR_FILENO, "PID\tPPID\tPRI\tSTAT\tCMD\n");
+  for (int i = 0; i < pcb_vec_len(self); i++) {
+    print_pcb_info_single_line(self->pcb_ptr_array[i]);
+  }
+}
+
+
+

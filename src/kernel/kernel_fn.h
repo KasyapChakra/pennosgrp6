@@ -51,10 +51,13 @@ void cancel_and_join_pcb(pcb_t* pcb_ptr);
 void cancel_and_join_thrd(spthread_t thread);
 
 /**
-* This function initializes the PennOS kernel.
-* It sets up the necessary data structures and starts the scheduler thread.
+* This function is the main function for init thread.
+* It sets up the necessary data structures and starts shell thread.
 */
-void pennos_init();
+void* thrd_init_fn([[maybe_unused]] void* arg);
+
+
+void pennos_kernel(void);
 
 
 void* thrd_print_p0([[maybe_unused]] void* arg);

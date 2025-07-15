@@ -37,13 +37,13 @@ typedef struct scheduler_para_st {
 void handler_sigalrm_scheduler(int signum);
 
 /**
- * This function is the main function for the scheduler thread.
+ * This function is the main function for the scheduler.
  * It implements the scheduling algorithm based on the provided parameters.
  *
- * @param arg Pointer to a scheduler_para_t structure containing scheduling parameters.
+ * @param arg_ptr Pointer to a scheduler_para_t structure containing scheduling parameters.
  * @return NULL (the return value is not used).
  */
-void* thrd_scheduler_fn([[maybe_unused]] void* arg);
+void scheduler_fn(scheduler_para_t* arg_ptr);
 
 
 

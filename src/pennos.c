@@ -12,7 +12,8 @@
 
 int main(void) {
 
-    pennos_init();
+    //pennos_init();
+    pennos_kernel();
 
     return EXIT_SUCCESS;
 }

@@ -63,7 +63,7 @@ typedef struct pcb_st {
 #define thrd_ppid(pcb_ptr) ((pcb_ptr)->ppid)
 #define thrd_priority(pcb_ptr) ((pcb_ptr)->priority_level)
 #define thrd_CMD(pcb_ptr) ((pcb_ptr)->command)
-#define thrd_num_child(pct_ptr) ((pcb_ptr)->num_child_pids)
+#define thrd_num_child(pcb_ptr) ((pcb_ptr)->num_child_pids)
 #define thrd_next(pcb_ptr) ((pcb_ptr)->next_pcb_ptr)
 
 #define thrd_status(pcb_ptr) ((pcb_ptr)->status)
@@ -99,11 +99,18 @@ void pcb_destroy(pcb_t* self_ptr);
  */
 void print_pcb_info(pcb_t* self_ptr);
 
+void print_pcb_info_single_line(pcb_t* self_ptr);
+
 
 // change between RUNNING and BLOCKED does NOT count as change
 bool is_thrd_status_changed(pcb_t* pcb_ptr);
 
 void reset_pcb_status_signal(pcb_t* pcb_ptr);
+
+int pcb_add_child_pid(pcb_t* self_ptr, pid_t pid);
+
+int pcb_remove_child_pid(pcb_t* self_ptr, pid_t pid);
+
 
 
 #endif  // PCB_H_

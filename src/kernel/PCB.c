@@ -7,6 +7,9 @@
  * =============================================================== */
 
 #include "./PCB.h"
+#include "./kernel_fn.h"
+#include "../util/panic.h"
+#include "./pcb_vec.h"
 
 #include <stdlib.h>
 #include <stdio.h> // for dprintf()
@@ -15,39 +18,52 @@
 
 int pcb_init_empty(pcb_t** result_pcb, int priority_code, pid_t pid) {
 
-    pcb_t* temp_pcb_ptr = calloc(1, sizeof(pcb_t));
-    if (temp_pcb_ptr == NULL) {
+    pcb_t* self_pcb_ptr = calloc(1, sizeof(pcb_t));
+    if (self_pcb_ptr == NULL) {
         // calloc() failed
         perror("pcb_init() memory allocation failed");
         return -1;
     }
 
+    pcb_t* parent_pcb_ptr = k_get_self_pcb();
+
     // --- ID ---    
-    temp_pcb_ptr->pid = pid;
-    temp_pcb_ptr->pgid = pid;
-    temp_pcb_ptr->ppid = 0;
+    self_pcb_ptr->pid = pid;
+    self_pcb_ptr->pgid = pid;
+    self_pcb_ptr->ppid = parent_pcb_ptr? thrd_pid(parent_pcb_ptr) : 0;
 
     // --- attributes ---
-    temp_pcb_ptr->priority_level = priority_code;     
+    self_pcb_ptr->priority_level = priority_code;     
 
     // --- child info ---
-    temp_pcb_ptr->num_child_pids = 0;    
+    self_pcb_ptr->num_child_pids = 0;  
+    for (int i = 0; i < NUM_CHILDREN_MAX; i++) {
+        self_pcb_ptr->child_pids[i] = -1; // empty child pid set to -1
+    }
+
+    // handle parent (if exists) PCB's child pid info
+    if (parent_pcb_ptr != NULL) {
+        if (pcb_add_child_pid(parent_pcb_ptr, pid) == -1) {
+            perror("pcb_init() failed to modify parent's child info");
+            return -1;
+        }
+    }    
 
     // --- for priority queue link list ---
-    temp_pcb_ptr->next_pcb_ptr = NULL;       
+    self_pcb_ptr->next_pcb_ptr = NULL;       
 
     // --- status related ---
-    temp_pcb_ptr->status = THRD_STOPPED;
-    temp_pcb_ptr->pre_status = thrd_status(temp_pcb_ptr);    
-    temp_pcb_ptr->exit_code = 0;
-    temp_pcb_ptr->term_signal = 0;
-    temp_pcb_ptr->stop_signal = 0;
-    temp_pcb_ptr->cont_signal = 0;
+    self_pcb_ptr->status = THRD_RUNNING;
+    self_pcb_ptr->pre_status = thrd_status(self_pcb_ptr);    
+    self_pcb_ptr->exit_code = 0;
+    self_pcb_ptr->term_signal = 0;
+    self_pcb_ptr->stop_signal = 0;
+    self_pcb_ptr->cont_signal = 0;
 
     // --- others (to be decided) ---
-    temp_pcb_ptr->fds = NULL;
+    self_pcb_ptr->fds = NULL;    
 
-    *result_pcb = temp_pcb_ptr;
+    *result_pcb = self_pcb_ptr;
     return 0;
 }
 
@@ -66,33 +82,84 @@ int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid
 
 void pcb_destroy(pcb_t* self_ptr) {
 
-    // likely need to free child_pds and fds
+    // handle parent (if exists) PCB's child pid info
+    pcb_t* parent_pcb_ptr = k_get_self_pcb();   
+
+    if (parent_pcb_ptr != NULL) {
+        if (pcb_remove_child_pid(parent_pcb_ptr, thrd_pid(self_ptr)) == -1) {
+            panic("pcb_destroy() failed to update parent child info");
+        }
+    }
+
+    // handle child (if exists) PCB's parent pid info
+    for (int i = 0; i < thrd_num_child(self_ptr); i++) {
+        pcb_t* child_pcb_ptr = pcb_vec_seek_pcb_by_pid(&all_unreaped_pcb_vector, self_ptr->child_pids[i]);
+        if (child_pcb_ptr == NULL) {
+            panic("pcb_destroy() failed to find the PCB for this thread's child");
+        }
+        child_pcb_ptr->ppid = thrd_ppid(self_ptr);
+    }
+
     free(self_ptr);
     self_ptr = NULL;
 }
 
 
-bool is_thrd_status_changed(pcb_t* pcb_ptr) {  
-    if ((thrd_status(pcb_ptr) == THRD_STOPPED) || (thrd_status(pcb_ptr) == THRD_ZOMBIE)) {
-        return (thrd_status(pcb_ptr) == thrd_pre_status(pcb_ptr));
+bool is_thrd_status_changed(pcb_t* self_ptr) {  
+    if ((thrd_status(self_ptr) == THRD_STOPPED) || (thrd_status(self_ptr) == THRD_ZOMBIE)) {
+        return (thrd_status(self_ptr) == thrd_pre_status(self_ptr));
     }
 
     // thread status is now either RUNNING or BLOCKED
     // -- change between RUNNING and BLOCKED does NOT count as change
     // -- change from STOPPED to RUNNING/BLOCKED only counts if there is SIGCONT    
-    if ((thrd_pre_status(pcb_ptr) == THRD_STOPPED) && (pcb_ptr->cont_signal == P_SIGCONT)) {
+    if ((thrd_pre_status(self_ptr) == THRD_STOPPED) && (self_ptr->cont_signal == P_SIGCONT)) {
         return true;
     } 
 
     return false;    
 }
 
-void reset_pcb_status_signal(pcb_t* pcb_ptr) {
-    pcb_ptr->pre_status = thrd_status(pcb_ptr);
-    pcb_ptr->exit_code = 0;
-    pcb_ptr->term_signal = 0;
-    pcb_ptr->stop_signal = 0;
-    pcb_ptr->cont_signal = 0;
+void reset_pcb_status_signal(pcb_t* self_ptr) {
+    self_ptr->pre_status = thrd_status(self_ptr);
+    self_ptr->exit_code = 0;
+    self_ptr->term_signal = 0;
+    self_ptr->stop_signal = 0;
+    self_ptr->cont_signal = 0;
+}
+
+int pcb_add_child_pid(pcb_t* self_ptr, pid_t pid) {
+    if (thrd_num_child(self_ptr) == NUM_CHILDREN_MAX) {
+        return -1; // child full
+    }
+
+    self_ptr->child_pids[thrd_num_child(self_ptr)] = pid;
+    self_ptr->num_child_pids++;
+    return 0;
+}
+
+int pcb_remove_child_pid(pcb_t* self_ptr, pid_t pid) {
+    if (thrd_num_child(self_ptr) == 0) {
+        return -1; // child empty
+    }
+
+    int child_index;
+    for (child_index = 0; child_index < thrd_num_child(self_ptr); child_index++) {
+        if (self_ptr->child_pids[child_index] == pid) {
+            break;
+        }
+    }
+
+    if (child_index == thrd_num_child(self_ptr)) {
+        return -1; // child pid not found
+    }
+
+    for (int i = child_index; i < thrd_num_child(self_ptr) - 1; i++) {
+        self_ptr->child_pids[i] = self_ptr->child_pids[i+1];
+    }
+    self_ptr->child_pids[thrd_num_child(self_ptr) - 1] = -1;
+    self_ptr->num_child_pids--;
+    return 0;
 }
 
 
@@ -102,12 +169,19 @@ void print_pcb_info(pcb_t* self_ptr) {
     dprintf(STDERR_FILENO, "\tThread PGID: %d\n", thrd_pgid(self_ptr));
     dprintf(STDERR_FILENO, "\tThread PPID: %d\n", thrd_ppid(self_ptr));    
     dprintf(STDERR_FILENO, "\tThread Priority Level: %d\n", thrd_priority(self_ptr));    
-    dprintf(STDERR_FILENO, "\tThread command: %s\n", self_ptr->command);    
-    dprintf(STDERR_FILENO, "\tThread Status: %d\n\n", thrd_status(self_ptr));
-
+    dprintf(STDERR_FILENO, "\tThread command: %s\n", thrd_CMD(self_ptr));        
+    dprintf(STDERR_FILENO, "\tThread Status: %d\n", thrd_status(self_ptr));
+    dprintf(STDERR_FILENO, "\tThread Number of child: %d\n", thrd_num_child(self_ptr));
+    dprintf(STDERR_FILENO, "\t\t--- List of child PIDs ---\n");
+    for (int i = 0; i < thrd_num_child(self_ptr); i++) {
+        dprintf(STDERR_FILENO, "\t\tChild # %d PID: %d\n", i, self_ptr->child_pids[i]);
+    }
+    dprintf(STDERR_FILENO, "\n");
 }
 
-
+void print_pcb_info_single_line(pcb_t* self_ptr) {
+    dprintf(STDERR_FILENO, "%d\t%d\t%d\t%d\t%s\n", thrd_pid(self_ptr), thrd_ppid(self_ptr), thrd_priority(self_ptr), thrd_status(self_ptr), thrd_CMD(self_ptr));
+}
 
 
 

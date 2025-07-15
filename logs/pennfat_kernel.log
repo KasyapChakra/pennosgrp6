@@ -1,2 +1,1 @@
-[2025-07-14 22:43:41] INFO [pennfat_kernel]: Logger successfully initialized for module 'pennfat_kernel'.
-[2025-07-14 22:43:51] WARN [pennfat_kernel]: [k_ls] Failed to list files: Filesystem not mounted.
+[2025-07-15 17:09:59] INFO [pennfat_kernel]: Logger successfully initialized for module 'pennfat_kernel'.

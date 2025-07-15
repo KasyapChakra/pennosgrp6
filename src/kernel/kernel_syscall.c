@@ -133,7 +133,7 @@ pcb_t* k_proc_create(pcb_t* parent_pcb_ptr, int priority_code) {
         panic("pcb_init() failed!\n");
     }
     spthread_enable_interrupts_self();    
-    pcb_ptr->ppid = parent_pcb_ptr ? thrd_pid(parent_pcb_ptr) : 0;
+    //pcb_ptr->ppid = parent_pcb_ptr ? thrd_pid(parent_pcb_ptr) : 0; //<-- included in pcb_init_empty()
 
     // thread will be assigned later by k_set_routine_and_run    
     pcb_vec_push_back(&all_unreaped_pcb_vector, pcb_ptr);
@@ -178,7 +178,7 @@ int k_proc_cleanup(pcb_t* pcb_ptr) {
         return -2;
     }
     // update parent of child threads to the init thread
-    for (int i = 0; i < thrd_num_child(pct_ptr); i++) {
+    for (int i = 0; i < thrd_num_child(pcb_ptr); i++) {
         // set child ppid to the pid of init thread (i.e. 0)
         pcb_t* child_pcb_ptr = pcb_vec_seek_pcb_by_pid(&all_unreaped_pcb_vector, pcb_ptr->child_pids[i]);
         if (child_pcb_ptr != NULL) {
