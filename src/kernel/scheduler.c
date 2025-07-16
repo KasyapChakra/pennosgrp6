@@ -27,10 +27,7 @@
 
 const int queue_pick_pattern[QUEUE_PICK_PATTERN_LENGTH] = {0, 1, 0, 2, 1, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 1, 0, 2};
 
-volatile unsigned long g_ticks = 0;   // total number of 100-ms clock ticks since boot
-#define TICKS_INC() do { g_ticks++; } while(0)
-// Keep old symbol for now so we don’t have to touch every call-site at once
-#define cumulative_tick_global ((int)g_ticks)
+volatile int cumulative_tick_global = 0; // for DEBUG, can be deleted later ////////////////
 
 
 void handler_sigalrm_scheduler(int signum) {
@@ -89,28 +86,6 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
 
         for (int i = 0; i < arg_ptr->q_pick_pattern_len; i++) {  
 
-            /* one clock tick just occurred – update global counter */
-            spthread_disable_interrupts_self();
-            TICKS_INC();
-
-            /* move any sleepers whose wake_tick has arrived back to run queues */
-            size_t blk_len = queue_len(&blocked_queue);
-            for (size_t bi = 0; bi < blk_len; bi++) {
-                if (queue_is_empty(&blocked_queue)) break;
-                pcb_t* sleeper = queue_head(&blocked_queue);
-                if (sleeper->wake_tick <= g_ticks) {
-                    pcb_queue_pop(&blocked_queue);
-                    sleeper->status = THRD_RUNNING;
-                    pcb_queue_push(&priority_queue_array[sleeper->priority_level], sleeper);
-                    klog("[%5d]\tUNBLOCKED\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(sleeper), sleeper->priority_level);
-                } else {
-                    /* not ready – rotate to maintain fairness */
-                    pcb_queue_pop(&blocked_queue);
-                    pcb_queue_push(&blocked_queue, sleeper);
-                }
-            }
-            spthread_enable_interrupts_self();
-
             if (pennos_done) {
                 break;
             }
@@ -130,6 +105,7 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
 
                 ///////////////////////// for DEBUG /////////////////////////
                 spthread_disable_interrupts_self();
+                cumulative_tick_global = (cumulative_tick_global + 1) % 10000;
                 dprintf(STDERR_FILENO, "Scheduler tick on empty queues: # %d\n", cumulative_tick_global);        
                 spthread_enable_interrupts_self();
                 /////////////////////////////////////////////////////////////        

@@ -119,6 +119,7 @@ pcb_t* k_proc_create(pcb_t* parent, int priority_code) {
     // thread will be assigned later by k_set_routine_and_run
     list_push_pcb(p);
     // log create
+    extern volatile int cumulative_tick_global;
     klog("[%5d]\tCREATE\t%d\t%d\tprocess", cumulative_tick_global, p->pid, p->priority_level);
     return p;
 }
@@ -136,6 +137,7 @@ pcb_t* k_proc_create(pcb_t* parent_pcb_ptr, int priority_code) {
     // thread will be assigned later by k_set_routine_and_run    
     pcb_vec_push_back(&all_unreaped_pcb_vector, pcb_ptr);
     // log create
+    extern volatile int cumulative_tick_global;
     klog("[%5d]\tCREATE\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(pcb_ptr), thrd_priority(pcb_ptr));
     return pcb_ptr;
 }
@@ -232,9 +234,7 @@ int k_set_routine_and_run(pcb_t* pcb_ptr, void* (*start_routine)(void*), void* a
     }
 
     spthread_disable_interrupts_self();
-    print_queue_info(&priority_queue_array[priority]);
     pcb_queue_push(&priority_queue_array[priority], pcb_ptr);
-    print_queue_info(&priority_queue_array[priority]);
     spthread_enable_interrupts_self();
 
     return 0;
@@ -475,7 +475,7 @@ int k_nice(pid_t pid, int priority) {
 
     int old = pcb_ptr->priority_level;
     pcb_ptr->priority_level = priority;
-    // cumulative_tick_global alias now provided by scheduler.h
+    extern volatile int cumulative_tick_global;
     klog("[%5d]\tNICE\t%d\t%d\t%d\tprocess", cumulative_tick_global, pcb_ptr->pid, old, priority);
 
     spthread_disable_interrupts_self();
@@ -509,7 +509,7 @@ void k_exit(void) {
         return;
     }
 
-    // cumulative_tick_global alias now provided by scheduler.h
+    extern volatile int cumulative_tick_global;
     /* re-parent any live children to init (pid 1) */
     pcb_t* curr = g_pcb_list_head;
     while (curr) {
@@ -529,41 +529,8 @@ void k_exit(void) {
 }
 
 void k_sleep([[maybe_unused]] clock_tick_t ticks) {
-    if (ticks == 0) {
-        return; // no-op
-    }
-
-    pcb_t* self_pcb = k_get_self_pcb();
-    if (self_pcb == NULL) {
-        return;
-    }
-
-    /* compute wake-up tick */
-    unsigned long wake_tick = g_ticks + ticks;
-
-    spthread_disable_interrupts_self();
-
-    /* remove from its current run queue */
-    for (int i = 0; i < NUM_PRIORITY_QUEUES; i++) {
-        pcb_t* popped = pcb_queue_pop_by_pid(&priority_queue_array[i], thrd_pid(self_pcb));
-        if (popped) {
-            break;
-        }
-    }
-
-    /* mark blocked and remember wake tick */
-    self_pcb->status = THRD_BLOCKED;
-    self_pcb->wake_tick = wake_tick;
-
-    /* push onto blocked queue */
-    pcb_queue_push(&blocked_queue, self_pcb);
-
-    klog("[%5d]\tBLOCKED\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(self_pcb), self_pcb->priority_level);
-
-    spthread_enable_interrupts_self();
-
-    /* yield by suspending ourselves until scheduler wakes us */
-    spthread_suspend(thrd_handle(self_pcb));
+    // stub – feature not implemented yet
+    (void)ticks;
 }
 
 int k_pipe([[maybe_unused]] int fds[2]) {

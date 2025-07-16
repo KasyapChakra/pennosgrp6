@@ -388,7 +388,6 @@ void* rm(void* arg) {
 
 int shell_main(struct parsed_command* cmd) {
 
-  dprintf(STDERR_FILENO, "Starting shell_main\n");
   /* ─────────────────────────────────────────────────────────────
     *  STEP ➊ : built-ins that must run *inside* the shell (nice,
     *           bg, fg, jobs, logout, man, …).
@@ -403,7 +402,6 @@ int shell_main(struct parsed_command* cmd) {
     return 0;   /* prompt user again            */
   }
 
-  dprintf(STDERR_FILENO, "shell_main: Past inline built-ins Step 1\n");
   /* ────────────────────────────────────────────────────────────
     *  From here on we know the command is *not* shell-local, so
     *  we treat it like an external pipeline: handle < > >> and
@@ -443,29 +441,22 @@ int shell_main(struct parsed_command* cmd) {
     close_out = true;
   }
 
-  dprintf(STDERR_FILENO, "shell_main: past opening redirections\n");
-
   pid_t child_pid = process_one_command(
       cmd->commands, cmd->num_commands, cmd->stdin_file, cmd->stdout_file,
       /* stderr */ NULL, cmd->is_file_append);
 
   if (child_pid <= 0)
-    return 0;
-
-  // dprintf(STDERR_FILENO, "command: %s %s %s\n", cmd->commands[0][0], 
-  //         cmd->commands[0][1], cmd->commands[0][2]);
-
-  // pid_t child_pid = spawn_stage(cmd->commands[0], redir_in, redir_out); // stuck in wait. Problem with spawn
+    return -1;
 
   if (!cmd->is_background) { /* foreground job           */
-    s_tcsetpid(child_pid);
-    s_waitpid(child_pid, NULL, false);
-    s_tcsetpid(shell_pgid);
+    dprintf(STDERR_FILENO, "shell_main: TODO: Should be waiting\n");
+    // s_tcsetpid(child_pid);  
+    // s_waitpid(child_pid, NULL, false); //TODO: Wait_pid not working
+    // waits infinitely, even when the child should have exited
+    // s_tcsetpid(shell_pgid);
   } else {
     /* TODO: store background job info */
   }
-
-  dprintf(STDERR_FILENO, "shell_main: past starting new process\n");
 
   if (close_in)
     s_close(redir_in);
@@ -473,8 +464,6 @@ int shell_main(struct parsed_command* cmd) {
     s_close(redir_out);
 
   AFTER_LOOP_CLEANUP:; /* empty statement so the label isn’t alone */
-
-  dprintf(STDERR_FILENO, "shell_main: Past clean up should return and prompt user again\n");
 
   return 0; /* prompt user again */
 }

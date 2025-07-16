@@ -174,22 +174,22 @@ void* thrd_init_fn([[maybe_unused]] void* arg) {
     // spthread_t temp_spthread;  
 
     // test thread for queue 0
-    spthread_create(&temp_spthread, NULL, thrd_print_p0, NULL);    
-    pcb_init(temp_spthread, &temp_pcb_ptr, 0, pid_count++, "Test1");
-    pcb_queue_push(&priority_queue_array[0], temp_pcb_ptr);
-    k_register_pcb(temp_pcb_ptr);
+    // spthread_create(&temp_spthread, NULL, thrd_print_p0, NULL);    
+    // pcb_init(temp_spthread, &temp_pcb_ptr, 0, pid_count++, "Test1");
+    // pcb_queue_push(&priority_queue_array[0], temp_pcb_ptr);
+    // k_register_pcb(temp_pcb_ptr);
        
-    // test thread for queue 1
-    spthread_create(&temp_spthread, NULL, thrd_print_p1, NULL);    
-    pcb_init(temp_spthread, &temp_pcb_ptr, 1, pid_count++, "Test2");
-    pcb_queue_push(&priority_queue_array[1], temp_pcb_ptr);
-    k_register_pcb(temp_pcb_ptr);
+    // // test thread for queue 1
+    // spthread_create(&temp_spthread, NULL, thrd_print_p1, NULL);    
+    // pcb_init(temp_spthread, &temp_pcb_ptr, 1, pid_count++, "Test2");
+    // pcb_queue_push(&priority_queue_array[1], temp_pcb_ptr);
+    // k_register_pcb(temp_pcb_ptr);
         
-    // test thread for queue 2
-    spthread_create(&temp_spthread, NULL, thrd_print_p2, NULL);    
-    pcb_init(temp_spthread, &temp_pcb_ptr, 2, pid_count++, "Test3");  
-    pcb_queue_push(&priority_queue_array[2], temp_pcb_ptr);      
-    k_register_pcb(temp_pcb_ptr);
+    // // test thread for queue 2
+    // spthread_create(&temp_spthread, NULL, thrd_print_p2, NULL);    
+    // pcb_init(temp_spthread, &temp_pcb_ptr, 2, pid_count++, "Test3");  
+    // pcb_queue_push(&priority_queue_array[2], temp_pcb_ptr);      
+    // k_register_pcb(temp_pcb_ptr);
 
     // print info for the 3 queues for debug ///////////////////
     print_queue_info(&priority_queue_array[0]);

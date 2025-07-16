@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "signal.h": "c",
-        "pennos_signal.h": "c"
+        "pennos_signal.h": "c",
+        "kernel_fn.h": "c"
     }
 }
