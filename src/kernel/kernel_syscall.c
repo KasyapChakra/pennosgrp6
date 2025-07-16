@@ -127,9 +127,8 @@ pcb_t* k_proc_create(pcb_t* parent, int priority_code) {
 
 pcb_t* k_proc_create(pcb_t* parent_pcb_ptr, int priority_code) {
     pcb_t* pcb_ptr;
-    spthread_disable_interrupts_self();
-    pid_count++;    
-    if (pcb_init_empty(&pcb_ptr, priority_code, pid_count) == -1) {
+    spthread_disable_interrupts_self();    
+    if (pcb_init_empty(&pcb_ptr, priority_code, pid_count++) == -1) {
         panic("pcb_init() failed!\n");
     }
     spthread_enable_interrupts_self();    
@@ -291,6 +290,7 @@ pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
 }
 */
 
+// not completed yet
 pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
     // the functions acts as if waitpid with both WUNTRACED and WCONTINUED flags
 
@@ -376,10 +376,8 @@ pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
 }
 
 
-///////////////////////NOT UPDATED YET FOR PCB VECTOR///////////////////////
-////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////
 
+/*
 int k_kill(pid_t pid, int sig) {
     //pcb_t* target = find_pcb_by_pid(pid);
     pcb_t* target = pcb_vec_seek_pcb_by_pid(&all_unreaped_pcb_vector, pid);
@@ -388,15 +386,65 @@ int k_kill(pid_t pid, int sig) {
     switch (sig) {
         case SIGTERM:
         default:
-            /* mark zombie and cancel thread */
+            // mark zombie and cancel thread 
             target->status = THRD_ZOMBIE;
             klog("[%5d]\tSIGNALED\t%d\t%d\tprocess", cumulative_tick_global, target->pid, target->priority_level);
             klog("[%5d]\tZOMBIE\t%d\t%d\tprocess", cumulative_tick_global, target->pid, target->priority_level);
             spthread_cancel(target->thrd);
-            /* immediate cleanup by parent if parent waiting */
+            // immediate cleanup by parent if parent waiting 
             return 0;
     }
 }
+*/
+
+int k_kill(pid_t pid, k_signal_t sig) {
+    
+    pcb_t* target = pcb_vec_seek_pcb_by_pid(&all_unreaped_pcb_vector, pid);
+    if (!target) return -1;
+
+    switch (sig) {
+        case P_SIGSTOP:
+            if (thrd_status(target) == THRD_RUNNING) {
+                spthread_suspend(thrd_handle(target));
+                target->status = THRD_STOPPED;
+                target->stop_signal = P_SIGSTOP;
+                pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(target)], pid);                
+            }
+            return 0;
+        case P_SIGCONT:
+            if (thrd_status(target) == THRD_STOPPED) {
+                target->status = THRD_RUNNING;
+                target->cont_signal = P_SIGCONT;
+                spthread_suspend(thrd_handle(target));
+                pcb_queue_push(&priority_queue_array[thrd_priority(target)], target);
+            }
+            return 0;
+        case P_SIGTERM:
+            if (thrd_status(target) != THRD_ZOMBIE) {
+                spthread_cancel(thrd_handle(target)); 
+                spthread_continue(thrd_handle(target));
+                spthread_suspend(thrd_handle(target)); 
+                target->status = THRD_ZOMBIE;
+                target->term_signal = P_SIGTERM;
+                pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(target)], pid);                
+                // need to update init PCB's child pids and child PCB's ppid to init                
+                // to do
+            }
+            return 0;
+        default:
+            /* mark zombie and cancel thread */
+            //target->status = THRD_ZOMBIE;
+            //klog("[%5d]\tSIGNALED\t%d\t%d\tprocess", cumulative_tick_global, target->pid, target->priority_level);
+            //klog("[%5d]\tZOMBIE\t%d\t%d\tprocess", cumulative_tick_global, target->pid, target->priority_level);
+            //spthread_cancel(target->thrd);
+            /* immediate cleanup by parent if parent waiting */
+            return 0;
+    }    
+}
+
+///////////////////////NOT UPDATED YET FOR PCB VECTOR///////////////////////
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
 
 int k_tcsetpid([[maybe_unused]] pid_t pid) {
     return -1; // terminal control not implemented yet

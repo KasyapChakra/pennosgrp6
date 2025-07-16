@@ -86,7 +86,7 @@ typedef unsigned int clock_tick_t;
 
 // wait / signal / scheduling helpers (stub for now)
 pid_t   k_waitpid(pid_t pid, int* wstatus, bool nohang);
-int     k_kill(pid_t pid, int sig);
+int     k_kill(pid_t pid, k_signal_t sig);
 int     k_tcsetpid(pid_t pid);
 int     k_nice(pid_t pid, int priority);
 void    k_sleep(clock_tick_t ticks);

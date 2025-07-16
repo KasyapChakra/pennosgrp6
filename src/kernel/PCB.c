@@ -181,7 +181,14 @@ void print_pcb_info(pcb_t* self_ptr) {
 }
 
 void print_pcb_info_single_line(pcb_t* self_ptr) {
-    dprintf(STDERR_FILENO, "%d\t%d\t%d\t%d\t%s\n", thrd_pid(self_ptr), thrd_ppid(self_ptr), thrd_priority(self_ptr), thrd_status(self_ptr), thrd_CMD(self_ptr));
+    const char* status_str;
+    switch (thrd_status(self_ptr)) {
+        case THRD_RUNNING: status_str = "R"; break;
+        case THRD_STOPPED: status_str = "S"; break;
+        case THRD_BLOCKED: status_str = "B"; break;
+        case THRD_ZOMBIE:  status_str = "Z"; break;
+    }    
+    dprintf(STDERR_FILENO, "%d\t%d\t%d\t%s\t%s\n", thrd_pid(self_ptr), thrd_ppid(self_ptr), thrd_priority(self_ptr), status_str, thrd_CMD(self_ptr));
 }
 
 

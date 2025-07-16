@@ -38,10 +38,9 @@ typedef enum {
 // continued
 #define P_WIFCONTINUED(wstatus) ((wstatus) == 0xFFFF) // returns true if the thread was continued (bit 0-15 all ONEs)
 
-
-
-
 // --------------------------------------- //
+
+
 
 
 #endif  // KERNEL_DEFINITION_H_
