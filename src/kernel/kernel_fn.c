@@ -79,8 +79,7 @@ void cancel_and_join_thrd(spthread_t thread) {
 }
 
 void pennos_kernel(void) {
-    pennos_done = false;   
-    k_errno = P_NOERROR;    
+    pennos_done = false;          
 
     // pid_count starts at 1 because init thread is the 1st thread
     pid_count = 1;    

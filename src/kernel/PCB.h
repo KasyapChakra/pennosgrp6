@@ -49,6 +49,7 @@ typedef struct pcb_st {
     k_signal_t term_signal;
     k_signal_t stop_signal;
     k_signal_t cont_signal;
+    int errno;
 
     // --- others (to be decided) ---
     int* fds; // array of file descriptors
@@ -68,6 +69,7 @@ typedef struct pcb_st {
 
 #define thrd_status(pcb_ptr) ((pcb_ptr)->status)
 #define thrd_pre_status(pcb_ptr) ((pcb_ptr)->pre_status)
+#define thrd_errno(pcb_ptr) ((pcb_ptr)->errno)
 
 
 // ============================ Functions ============================ //

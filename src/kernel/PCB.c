@@ -59,6 +59,7 @@ int pcb_init_empty(pcb_t** result_pcb, int priority_code, pid_t pid) {
     self_pcb_ptr->term_signal = 0;
     self_pcb_ptr->stop_signal = 0;
     self_pcb_ptr->cont_signal = 0;
+    self_pcb_ptr->errno = 0;
 
     // --- others (to be decided) ---
     self_pcb_ptr->fds = NULL;    
