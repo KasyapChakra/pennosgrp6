@@ -14,7 +14,11 @@
 #include <string.h>
 #include <unistd.h>
 
-
+typedef struct syscall_spawn_arg {
+  int fd0, fd1;
+  void* (*func)(void*);
+  void* real_arg;
+} syscall_spawn_arg;
 // simple singly-linked list of all pcbs – head pointer
 // static pcb_t* g_pcb_list_head = NULL;
 /*
@@ -217,7 +221,7 @@ int k_set_routine_and_run(pcb_t* proc, void* (*start_routine)(void*), void* arg)
     return 0;
 }
 */
-
+/*
 int k_set_routine_and_run(pcb_t* pcb_ptr, void* (*start_routine)(void*), void* arg) {
     if (!pcb_ptr || !start_routine) {
         return -1;
@@ -242,6 +246,80 @@ int k_set_routine_and_run(pcb_t* pcb_ptr, void* (*start_routine)(void*), void* a
     spthread_enable_interrupts_self();
 
     return 0;
+}
+*/
+static int set_routine_and_run_helper(pcb_t* proc,
+                                      void* (*func)(void*),
+                                      void* arg,
+                                      bool wrap_exit) {
+  if (!proc) {
+    klog("k_set_routine_and_run_helper: NULL proc pointer");
+    return -2;
+  }
+  if (!func) {
+    klog("k_set_routine_and_run_helper: NULL function pointer");
+    return -2;
+  }
+
+  // 1) create the spthread
+  int create_status;
+  if (wrap_exit) {
+    routine_exit_wrapper_args_t* wrapped_args =
+        wrap_routine_exit_args(func, arg);
+    create_status = spthread_create(&proc->thrd, NULL,
+                                    routine_exit_wrapper_func, wrapped_args);
+  } else {
+    create_status = spthread_create(&proc->thrd, NULL, func, arg);
+  }
+  if (create_status != 0) {
+    klog("k_set_routine_and_run_helper: spthread_create failed for PID[%d]",
+         thrd_pid(proc));
+    proc->status = THRD_ZOMBIE;
+    return -1;
+  }
+  klog("k_set_routine_and_run_helper: created thread for PID[%d]",
+       thrd_pid(proc));
+
+  // 2) choose a readable process_name
+  const char* process_name = "ps";
+  if (proc->pid == INIT_PID) {
+    process_name = INIT_PROCESS_NAME;
+  } else if (wrap_exit && arg && looks_like_cstring(((char**)arg)[0])) {
+    process_name = ((char**)arg)[0];
+  } else if (func == spawn_entry_wrapper_kernel && arg) {
+    syscall_spawn_arg* sw = (syscall_spawn_arg*)arg;
+    if (sw->fd0 >= 0 && sw->fd0 != STDIN_FILENO) {
+      dup2(sw->fd0, STDIN_FILENO);
+      close(sw->fd0);
+    }
+    if (sw->fd1 >= 0 && sw->fd1 != STDOUT_FILENO) {
+      dup2(sw->fd1, STDOUT_FILENO);
+      close(sw->fd1);
+    }
+    char** maybe_argv = (char**)sw->real_arg;
+    if (maybe_argv && looks_like_cstring(maybe_argv[0]))
+      process_name = maybe_argv[0];
+  }
+  set_process_name(proc, process_name);
+  klog("k_set_routine_and_run_helper: set process name for PID[%d]: %s",
+       thrd_pid(proc), proc->command);
+
+  // 3) enqueue into READY queue
+  proc->status = THRD_RUNNING;
+  spthread_disable_interrupts_self();
+  pcb_queue_push(&priority_queue_array[thrd_priority(proc)], proc);
+  spthread_enable_interrupts_self();
+
+  // 4) record lifecycle event
+  lifecycle_event_log(proc, "CREATED", NULL);
+
+  return 0;
+}
+
+int k_set_routine_and_run(pcb_t* pcb_ptr,
+                          void* (*start_routine)(void*),
+                          void* arg) {
+  return set_routine_and_run_helper(pcb_ptr, start_routine, arg, true);
 }
 
 
