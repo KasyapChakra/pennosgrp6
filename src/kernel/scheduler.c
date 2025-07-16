@@ -120,10 +120,10 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
             pcb_queue_t* curr_queue_ptr = &arg_ptr->q_array[arg_ptr->q_pick_pattern_array[i]];
             if (queue_is_empty(curr_queue_ptr)) {
                 spthread_enable_interrupts_self(); // protection OFF
-                sigsuspend(&sig_set_ex_sigalrm);
                 continue;
             }
             curr_pcb_ptr = queue_head(curr_queue_ptr);
+            spthread_continue(thrd_handle(curr_pcb_ptr));
             spthread_enable_interrupts_self(); // protection OFF
 
 
@@ -140,8 +140,6 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
 
             spthread_disable_interrupts_self(); // protection ON                    
             spthread_suspend(thrd_handle(curr_pcb_ptr));
-
-            spthread_disable_interrupts_self(); // protection ON
             curr_pcb_ptr = pcb_queue_pop(curr_queue_ptr);
             pcb_queue_push(curr_queue_ptr, curr_pcb_ptr);
             spthread_enable_interrupts_self(); // protection OFF

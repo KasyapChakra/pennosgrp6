@@ -228,8 +228,8 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
         // this function is modifed to run in this loop but take advantage of the already made command
         if (!is_experimental_cmd) { // TODO eventually remove this 
           if (shell_main(pcmd_ptr) == -1) {
-            dprintf(STDERR_FILENO, "ERR: shell_main failed\n");
             free(pcmd_ptr);
+            pcmd_ptr = NULL;
             continue;
           }
         }
