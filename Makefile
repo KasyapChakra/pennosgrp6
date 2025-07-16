@@ -2,14 +2,14 @@ SRC_DIR = src
 BIN_DIR = bin
 LOG_DIR = log
 DOC_DIR = doc
-TESTS_DIR = tests
+TESTS_DIR = test
 
 .PHONY: all tests info format clean
 
 CC = clang-15
 CXX = clang++-15
-CFLAGS = -g3 -gdwarf-4 -pthread -Wall -Werror -Wno-gnu -O0 -g --std=gnu2x
-CXXFLAGS = -g3 -gdwarf-4 -pthread -l -Werror -Wno-gnu -O0 -g --std=gnu++2b
+CFLAGS = -g3 -gdwarf-4 -pthread -Wall -Werror -Wno-gnu -O0 -g --std=gnu2x 
+CXXFLAGS = -g3 -gdwarf-4 -pthread -Wall -Werror -Wno-gnu -O0 -g --std=gnu++2b
 
 # tells it to search for 
 CPPFLAGS = -I $(SRC_DIR)
@@ -17,12 +17,13 @@ CPPFLAGS = -I $(SRC_DIR)
 # add each test name to this list
 # for example:
 # TEST_MAINS = $(TESTS_DIR)/test1.c $(TESTS_DIR)/othertest.c $(TESTS_DIR)/sched-demo.c
-TEST_MAINS = $(TESTS_DIR)/sched-demo.c $(TESTS_DIR)/test.c 
+# TEST_MAINS = $(TESTS_DIR)/sched-demo.c 
+TEST_MAINS = $(TESTS_DIR)/sched-demo.c $(TESTS_DIR)/process_control_tst.c $(TESTS_DIR)/scheduling_pattern_tst.c $(TESTS_DIR)/shell_syscalls_tst.c
 
 # list all files with their own main() function here
 # for example:
 # MAIN_FILES = $(SRC_DIR)/stand_alone_pennfat.c $(SRC_DIR)/helloworld.c $(SRC_DIR)/pennos.c
-MAIN_FILES = $(SRC_DIR)/pennos.c
+MAIN_FILES = $(SRC_DIR)/pennos.c $(SRC_DIR)/pennfat.c
 
 # to get the executables, remove the .c from the filename and put 
 # it in the BIN_DIR
@@ -31,8 +32,6 @@ TEST_EXECS = $(subst $(TESTS_DIR),$(BIN_DIR),$(TEST_MAINS:.c=))
 
 # srcs = all C files in SRC_DIR that are not listed in MAIN_FILES
 SRCS = $(filter-out $(MAIN_FILES), $(shell find $(SRC_DIR) -type f -name '*.c'))
-# exclude duplicate util spthread implementation
-SRCS := $(filter-out $(SRC_DIR)/util/spthread.c, $(SRCS))
 HDRS = $(shell find src -type f -name '*.h')
 OBJS = $(SRCS:.c=.o)
 

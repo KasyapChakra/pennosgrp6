@@ -2057,7 +2057,8 @@ PennFatErr k_mount(const char* fs_name) {
   uint8_t block_size_config = super_entry & 0xFF;
   uint8_t fat_blocks = (super_entry >> 8) & 0xFF;
 
-  if (block_size_config > 4) {
+  size_t n_cfgs = sizeof(block_sizes) / sizeof(block_sizes[0]);
+  if (block_size_config >= n_cfgs) {
     LOG_ERR("[k_mount] Invalid block size config: %u", block_size_config);
     close(fd);
     return PennFatErr_INVAD;

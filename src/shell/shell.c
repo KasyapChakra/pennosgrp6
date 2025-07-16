@@ -165,7 +165,7 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
     sigaddset(&sig_set_shell, SIGALRM);
     pthread_sigmask(SIG_BLOCK, &sig_set_shell, NULL); 
 
-    // unblock SIGINT and 
+    // unblock SIGINT and SIGTSTP
     sigemptyset(&sig_set_shell);
     sigaddset(&sig_set_shell, SIGINT);
     sigaddset(&sig_set_shell, SIGTSTP);
@@ -196,6 +196,7 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
             continue;
         }   
 
+<<<<<<< HEAD
         // parse the command into the parsed_command structure
         struct parsed_command* pcmd_ptr = NULL;
         int parse_ret = parse_command(cmd_string, &pcmd_ptr);
@@ -204,6 +205,27 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
           dprintf(STDERR_FILENO, "ERR: invalid user command\n");
           free(pcmd_ptr);
           continue;
+=======
+        // simple parsing: first token by whitespace
+        char* saveptr;
+        char* tok = strtok_r(cmd_string, " \t\n", &saveptr);
+        if (!tok) continue;
+
+        if (strcmp(tok, "ps") == 0) {
+            s_spawn(ps_builtin, NULL, -1, -1);
+        } else if (strcmp(tok, "busy") == 0) {
+            s_spawn(busy_builtin, NULL, -1, -1);
+        } else if (strcmp(tok, "zombify") == 0) {
+            s_spawn(zombify, NULL, -1, -1);
+        } else if (strcmp(tok, "orphanify") == 0) {
+            s_spawn(orphanify, NULL, -1, -1);
+        } else if (strcmp(tok, "pcbvec") == 0) {
+            print_pcb_vec_info(&all_unreaped_pcb_vector);
+        } else if (strcmp(tok, "ps1") == 0) {
+            ps_print_pcb_vec_info(&all_unreaped_pcb_vector);
+        } else {
+            dprintf(STDERR_FILENO, "unknown command: %s\n", tok);
+>>>>>>> origin/main
         }
 
         if (pcmd_ptr->num_commands == 0) {
@@ -241,7 +263,7 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
         
     }// end of shell-loop
 
-    dprintf(STDERR_FILENO, "########### Shell thread ended ###########\n");
+    dprintf(STDERR_FILENO, "~~~~~~~~~~ Shell thread exit ~~~~~~~~~~\n");
 
     spthread_exit(NULL);
     return NULL;   

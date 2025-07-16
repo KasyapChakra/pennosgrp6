@@ -15,12 +15,15 @@
 #include "./PCB.h"
 #include "./pcb_queue.h"
 #include "./pcb_vec.h"
+#include "./kernel_definition.h"
+
 
 #define NUM_PRIORITY_QUEUES 3
 
 // ============================ Global Variables ============================ // 
 extern volatile pid_t pid_count;
 extern volatile bool pennos_done;
+extern volatile k_errno_t k_errno;
 
 // set queues as global variable so that scheduler thread and other threads can access the queues
 extern pcb_queue_t priority_queue_array[NUM_PRIORITY_QUEUES]; 
@@ -57,10 +60,13 @@ void cancel_and_join_pcb(pcb_t* pcb_ptr);
 void cancel_and_join_thrd(spthread_t thread);
 
 /**
-* This function initializes the PennOS kernel.
-* It sets up the necessary data structures and starts the scheduler thread.
+* This function is the main function for init thread.
+* It sets up the necessary data structures and starts shell thread.
 */
-void pennos_init();
+void* thrd_init_fn([[maybe_unused]] void* arg);
+
+
+void pennos_kernel(void);
 
 
 void* thrd_print_p0([[maybe_unused]] void* arg);
@@ -89,7 +95,7 @@ typedef unsigned int clock_tick_t;
 
 // wait / signal / scheduling helpers (stub for now)
 pid_t   k_waitpid(pid_t pid, int* wstatus, bool nohang);
-int     k_kill(pid_t pid, int sig);
+int     k_kill(pid_t pid, k_signal_t sig);
 int     k_tcsetpid(pid_t pid);
 int     k_nice(pid_t pid, int priority);
 void    k_sleep(clock_tick_t ticks);

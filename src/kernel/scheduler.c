@@ -13,6 +13,7 @@
 #include "./pcb_queue.h"
 #include "./kernel_fn.h"
 #include "./klogger.h"
+#include "./kernel_definition.h"
 
 #include <signal.h>
 #include <stdbool.h>
@@ -37,10 +38,10 @@ void handler_sigalrm_scheduler(int signum) {
     // the handler is for scheduler thread
 }
 
-void* thrd_scheduler_fn(void* arg) {
-    scheduler_para_t* arg_ptr = (scheduler_para_t*) arg; 
 
-    // scheduler thread needs to receive SIGALRM (from timer) 
+void scheduler_fn(scheduler_para_t* arg_ptr) {    
+
+    // scheduler needs to receive SIGALRM (from timer) 
     // but not be terminated by SIGALRM
     // hence install empty handler that does nothing but not block SIGALRM
 
@@ -145,39 +146,11 @@ void* thrd_scheduler_fn(void* arg) {
                 spthread_enable_interrupts_self(); // protection OFF
                 continue;
             }
-
-            /* Find the next runnable PCB in this queue.  
-             *   – THRD_RUNNING = choose it for execution
-             *   – THRD_STOPPED / THRD_BLOCKED = round-robin skip (pop & push)
-             *   – THRD_ZOMBIE = remove from queue entirely
-             */
-            size_t qlen = queue_len(curr_queue_ptr);
-            size_t tries = qlen;
-            curr_pcb_ptr = NULL;
-            while (tries-- > 0 && !queue_is_empty(curr_queue_ptr)) {
-                pcb_t* candidate = queue_head(curr_queue_ptr);
-                thrd_status_t st = thrd_status(candidate);
-                if (st == THRD_ZOMBIE) {
-                    /* discard zombies – they will be reaped elsewhere */
-                    pcb_queue_pop(curr_queue_ptr);
-                    continue;
-                }
-                if (st == THRD_RUNNING) {
-                    curr_pcb_ptr = candidate;
-                    break;
-                }
-                /* stopped or blocked – round-robin skip */
-                pcb_queue_pop(curr_queue_ptr);
-                pcb_queue_push(curr_queue_ptr, candidate);
-            }
-            if (curr_pcb_ptr == NULL) {
-                /* no runnable task found in this queue for this tick */
-                spthread_enable_interrupts_self(); // protection OFF
-                continue;
-            }
+            curr_pcb_ptr = queue_head(curr_queue_ptr);
+            spthread_continue(thrd_handle(curr_pcb_ptr));
             spthread_enable_interrupts_self(); // protection OFF
 
-            spthread_continue(thrd_handle(curr_pcb_ptr));
+
             klog("[%5d]\tSCHEDULE\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(curr_pcb_ptr), queue_type(curr_queue_ptr));
             
             ///////////////////////// for DEBUG /////////////////////////
@@ -187,26 +160,18 @@ void* thrd_scheduler_fn(void* arg) {
             // spthread_enable_interrupts_self();
             /////////////////////////////////////////////////////////////     
 
-            sigsuspend(&sig_set_ex_sigalrm);            
-            spthread_suspend(thrd_handle(curr_pcb_ptr));
+            sigsuspend(&sig_set_ex_sigalrm);    
 
-            spthread_disable_interrupts_self(); // protection ON
-            /* remove head (should be curr_pcb_ptr) */
-            pcb_queue_pop(curr_queue_ptr);
-            /* re-queue only if it is still runnable/eligible */
-            thrd_status_t post_status = thrd_status(curr_pcb_ptr);
-            if (post_status == THRD_RUNNING || post_status == THRD_STOPPED || post_status == THRD_BLOCKED) {
-                pcb_queue_push(curr_queue_ptr, curr_pcb_ptr);
-            }
-            /* if ZOMBIE – drop, it will be reaped later */
+            spthread_disable_interrupts_self(); // protection ON                    
+            spthread_suspend(thrd_handle(curr_pcb_ptr));
+            curr_pcb_ptr = pcb_queue_pop(curr_queue_ptr);
+            pcb_queue_push(curr_queue_ptr, curr_pcb_ptr);
             spthread_enable_interrupts_self(); // protection OFF
 
         }
 
     }    
 
-    dprintf(STDERR_FILENO, "########### Scheduler exit ###########\n");
+    dprintf(STDERR_FILENO, "~~~~~~~~~~ Scheduler function exit ~~~~~~~~~~\n");
 
-    spthread_exit(NULL);
-    return NULL;   
 }

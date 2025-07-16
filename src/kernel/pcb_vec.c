@@ -7,8 +7,10 @@
  * =============================================================== */
 
 #include "./pcb_vec.h"
-#include <stdlib.h>
 #include "../util/panic.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 //Vec vec_new(size_t initial_capacity, ptr_dtor_fn ele_dtor_fn)
 
@@ -213,6 +215,23 @@ pcb_t* pcb_vec_seek_pcb_by_thrd(pcb_vec_t* self, pthread_t thrd) {
   }
 
   return NULL; // target pcb not found    
+}
+
+void print_pcb_vec_info(pcb_vec_t* self) {    
+  dprintf(STDERR_FILENO, "============ Print PCB vector info ============\n");
+  dprintf(STDERR_FILENO, "PCB vec length: %zu\n", pcb_vec_len(self));    
+  dprintf(STDERR_FILENO, "~~~~~~ Now print each PCB info ~~~~~~\n");
+  for (int i = 0; i < pcb_vec_len(self); i++) {
+    print_pcb_info(self->pcb_ptr_array[i]);
+  }
+}
+
+
+void ps_print_pcb_vec_info(pcb_vec_t* self) {
+  dprintf(STDERR_FILENO, "PID\tPPID\tPRI\tSTAT\tCMD\n");
+  for (int i = 0; i < pcb_vec_len(self); i++) {
+    print_pcb_info_single_line(self->pcb_ptr_array[i]);
+  }
 }
 
 
