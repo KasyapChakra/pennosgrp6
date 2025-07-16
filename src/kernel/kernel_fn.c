@@ -194,9 +194,9 @@ void* thrd_init_fn([[maybe_unused]] void* arg) {
     // k_register_pcb(temp_pcb_ptr);
 
     // print info for the 3 queues for debug ///////////////////
-    print_queue_info(&priority_queue_array[0]);
-    print_queue_info(&priority_queue_array[1]);
-    print_queue_info(&priority_queue_array[2]);   
+    // print_queue_info(&priority_queue_array[0]);
+    // print_queue_info(&priority_queue_array[1]);
+    // print_queue_info(&priority_queue_array[2]);   
 
 
     ///////////////////////////////////////////////////////////

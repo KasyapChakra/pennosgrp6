@@ -235,9 +235,9 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
         }
 
         // wait on any finished children before next prompt
-        while (s_waitpid(-1, NULL, true) > 0) {
-            ;
-        }
+        //while (s_waitpid(-1, NULL, true) > 0) {
+        //    ;
+        // }
 
         free(pcmd_ptr);  // free the parsed command structure
         pcmd_ptr = NULL;
