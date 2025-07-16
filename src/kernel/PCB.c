@@ -16,7 +16,7 @@
 #include <unistd.h> // for STDERR_FILENO
 
 
-int pcb_init_empty(pcb_t** result_pcb, int priority_code, pid_t pid) {
+int pcb_init_empty(pcb_t** result_pcb, pcb_t* parent_pcb_ptr, int priority_code, pid_t pid) {
 
     pcb_t* self_pcb_ptr = calloc(1, sizeof(pcb_t));
     if (self_pcb_ptr == NULL) {
@@ -24,8 +24,7 @@ int pcb_init_empty(pcb_t** result_pcb, int priority_code, pid_t pid) {
         perror("pcb_init() memory allocation failed");
         return -1;
     }
-
-    pcb_t* parent_pcb_ptr = k_get_self_pcb();
+    
 
     // --- ID ---    
     self_pcb_ptr->pid = pid;
@@ -53,9 +52,9 @@ int pcb_init_empty(pcb_t** result_pcb, int priority_code, pid_t pid) {
     self_pcb_ptr->next_pcb_ptr = NULL;       
 
     // --- status related ---
-    self_pcb_ptr->status = THRD_RUNNING;
+    self_pcb_ptr->status = THRD_STOPPED;
     self_pcb_ptr->pre_status = thrd_status(self_pcb_ptr);    
-    self_pcb_ptr->exit_code = 0;
+    self_pcb_ptr->exit_code = -1;
     self_pcb_ptr->term_signal = 0;
     self_pcb_ptr->stop_signal = 0;
     self_pcb_ptr->cont_signal = 0;
@@ -69,37 +68,42 @@ int pcb_init_empty(pcb_t** result_pcb, int priority_code, pid_t pid) {
 }
 
 
-int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid, 
+int pcb_init(spthread_t thread, pcb_t** result_pcb, pcb_t* parent_pcb_ptr, int priority_code, pid_t pid, 
              char* command) {
 
-    if (pcb_init_empty(result_pcb, priority_code, pid) == -1) {
+    if (pcb_init_empty(result_pcb, parent_pcb_ptr, priority_code, pid) == -1) {
         return -1;
     }
     
     (*result_pcb)->thrd = thread;
     (*result_pcb)->command = command; 
+    (*result_pcb)->status = THRD_RUNNING;
     return 0;
 }
 
-void pcb_destroy(pcb_t* self_ptr) {
-
+void pcb_disconnect_parent_child(pcb_t* self_ptr) {
     // handle parent (if exists) PCB's child pid info
-    pcb_t* parent_pcb_ptr = k_get_self_pcb();   
+    // pcb_t* parent_pcb_ptr = k_get_self_pcb();   // old code
+    pcb_t* parent_pcb_ptr = pcb_vec_seek_pcb_by_pid(&all_unreaped_pcb_vector, thrd_ppid(self_ptr)); 
 
     if (parent_pcb_ptr != NULL) {
         if (pcb_remove_child_pid(parent_pcb_ptr, thrd_pid(self_ptr)) == -1) {
-            panic("pcb_destroy() failed to update parent child info");
+            panic("pcb_disconnect_parent_child() failed to update parent child info");
         }
     }
 
     // handle child (if exists) PCB's parent pid info
     for (int i = 0; i < thrd_num_child(self_ptr); i++) {
         pcb_t* child_pcb_ptr = pcb_vec_seek_pcb_by_pid(&all_unreaped_pcb_vector, self_ptr->child_pids[i]);
-        if (child_pcb_ptr == NULL) {
-            panic("pcb_destroy() failed to find the PCB for this thread's child");
-        }
-        child_pcb_ptr->ppid = thrd_ppid(self_ptr);
+        if (child_pcb_ptr != NULL) {
+            child_pcb_ptr->ppid = 1; // assign child parent to init (pid = 1)            
+        }    
     }
+}
+
+void pcb_destroy(pcb_t* self_ptr) {
+
+    pcb_disconnect_parent_child(self_ptr);
 
     free(self_ptr);
     self_ptr = NULL;

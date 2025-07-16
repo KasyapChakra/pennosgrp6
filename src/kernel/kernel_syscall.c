@@ -16,7 +16,7 @@
 
 
 // simple singly-linked list of all pcbs – head pointer
-static pcb_t* g_pcb_list_head = NULL;
+// static pcb_t* g_pcb_list_head = NULL;
 /*
 
 // ───────────────── helper internals ────────────────────────────────
@@ -128,7 +128,7 @@ pcb_t* k_proc_create(pcb_t* parent, int priority_code) {
 pcb_t* k_proc_create(pcb_t* parent_pcb_ptr, int priority_code) {
     pcb_t* pcb_ptr;
     spthread_disable_interrupts_self();    
-    if (pcb_init_empty(&pcb_ptr, priority_code, pid_count++) == -1) {
+    if (pcb_init_empty(&pcb_ptr, parent_pcb_ptr, priority_code, pid_count++) == -1) {
         panic("pcb_init() failed!\n");
     }
     spthread_enable_interrupts_self();    
@@ -172,10 +172,12 @@ int k_proc_cleanup(pcb_t* pcb_ptr) {
     if (pcb_ptr == NULL) {
         return -1;
     }
+    /*
     // can only cleanup terminated/finished thread
     if (thrd_status(pcb_ptr) != THRD_ZOMBIE) {
         return -2;
     }
+
     // update parent of child threads to the init thread
     for (int i = 0; i < thrd_num_child(pcb_ptr); i++) {
         // set child ppid to the pid of init thread (i.e. 0)
@@ -184,6 +186,7 @@ int k_proc_cleanup(pcb_t* pcb_ptr) {
             child_pcb_ptr->ppid = 0;     
         }        
     }
+    */
 
     pcb_vec_remove_by_pcb(&all_unreaped_pcb_vector, pcb_ptr);
     pcb_destroy(pcb_ptr);
@@ -226,7 +229,8 @@ int k_set_routine_and_run(pcb_t* pcb_ptr, void* (*start_routine)(void*), void* a
     }
 
     pcb_ptr->thrd = thrd;
-    pcb_ptr->status = THRD_STOPPED;
+    pcb_ptr->command = "to be set by k_set_routine_and_run()";
+    pcb_ptr->status = THRD_RUNNING;
 
     int priority = thrd_priority(pcb_ptr);
     if (priority < 0 || priority >= NUM_PRIORITY_QUEUES) {
@@ -291,6 +295,92 @@ pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
 */
 
 // not completed yet
+/*
+pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
+    // the functions acts as if waitpid with both WUNTRACED and WCONTINUED flags
+
+    pcb_t* self_pcb_ptr = k_get_self_pcb();
+    if (self_pcb_ptr == NULL) {
+        return -1;
+    }
+    
+    while (true) {
+        bool no_target_child = true; // relevent for ECHILD
+        bool no_update = true; // relevant for NOHANG
+
+        for (int i = 0; i < pcb_vec_len(&all_unreaped_pcb_vector); i++) {
+            pcb_t* curr_pcb_ptr = all_unreaped_pcb_vector.pcb_ptr_array[i];
+            bool is_child = (thrd_ppid(curr_pcb_ptr) == thrd_pid(self_pcb_ptr));
+            bool pid_match = ((pid == -1) || (thrd_pid(curr_pcb_ptr) == pid) || (thrd_pgid(curr_pcb_ptr) == -pid));
+            if (is_child && pid_match) {
+                no_target_child = false;
+
+                if (!is_thrd_status_changed(curr_pcb_ptr)) {
+                    continue;
+                }
+
+                no_update = false;                         
+
+                if (thrd_status(curr_pcb_ptr) == THRD_STOPPED) {
+                    if (curr_pcb_ptr->stop_signal != P_SIGSTOP) {
+                        panic("Thread was stopped but not by P_SIGSTOP!\n");
+                    }
+                    *wstatus = (curr_pcb_ptr->stop_signal << 8) | 0x7F; 
+                    reset_pcb_status_signal(curr_pcb_ptr);           
+                    return thrd_pid(curr_pcb_ptr);
+                }
+
+                if (thrd_status(curr_pcb_ptr) == THRD_ZOMBIE) {
+                    if (curr_pcb_ptr->term_signal == 0) {
+                        // exited normally
+                        *wstatus = curr_pcb_ptr->exit_code << 8; 
+                        reset_pcb_status_signal(curr_pcb_ptr);            
+                    } else {
+                        // terminated by signal
+                        if (curr_pcb_ptr->term_signal != P_SIGTERM) {
+                            panic("Thread was terminated but not by P_SIGTERM!\n");
+                        }
+                        *wstatus = curr_pcb_ptr->term_signal;
+                        reset_pcb_status_signal(curr_pcb_ptr); 
+                    }              
+                    
+                    pid_t result_pid = thrd_pid(curr_pcb_ptr);                    
+
+                    // pop up the pcb and clear it
+                    /////////////////////////////////////////
+                    /////////////////////////////////////////
+                    /////////////////////////////////////////
+
+                    return result_pid;
+                }
+                            
+                if ((thrd_status(curr_pcb_ptr) == THRD_RUNNING) || (thrd_status(curr_pcb_ptr) == THRD_BLOCKED)) {
+                    if (curr_pcb_ptr->cont_signal != P_SIGCONT) {
+                        panic("Thread was continued but not by P_SIGCONT!\n");
+                    }
+                    *wstatus = 0xFFFF; 
+                    reset_pcb_status_signal(curr_pcb_ptr);           
+                    return thrd_pid(curr_pcb_ptr);
+                }  
+            }
+        }
+
+        if (no_target_child) {
+            k_errno = P_ECHILD;
+            return -1;
+        }
+
+        if (nohang && no_update) {
+            return 0;   // there still exist non-zombie children
+                        // there are no update from these children since last wait                         
+        }
+
+        // crude sleep before retry to avoid busy spin 
+        usleep(1000); // 1ms
+    }
+}
+*/
+
 pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
     // the functions acts as if waitpid with both WUNTRACED and WCONTINUED flags
 
@@ -399,47 +489,118 @@ int k_kill(pid_t pid, int sig) {
 
 int k_kill(pid_t pid, k_signal_t sig) {
     
-    pcb_t* target = pcb_vec_seek_pcb_by_pid(&all_unreaped_pcb_vector, pid);
-    if (!target) return -1;
+    pcb_t* target_pcb_ptr = pcb_vec_seek_pcb_by_pid(&all_unreaped_pcb_vector, pid);
+    if (!target_pcb_ptr) return -1;
 
     switch (sig) {
         case P_SIGSTOP:
-            if (thrd_status(target) == THRD_RUNNING) {
-                spthread_suspend(thrd_handle(target));
-                target->status = THRD_STOPPED;
-                target->stop_signal = P_SIGSTOP;
-                pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(target)], pid);                
+            if (thrd_status(target_pcb_ptr) == THRD_RUNNING) {
+                spthread_suspend(thrd_handle(target_pcb_ptr));
+                target_pcb_ptr->status = THRD_STOPPED;
+                target_pcb_ptr->stop_signal = P_SIGSTOP;
+
+                spthread_disable_interrupts_self();
+                pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(target_pcb_ptr)], pid);                
+                spthread_enable_interrupts_self(); 
             }
             return 0;
         case P_SIGCONT:
-            if (thrd_status(target) == THRD_STOPPED) {
-                target->status = THRD_RUNNING;
-                target->cont_signal = P_SIGCONT;
-                spthread_suspend(thrd_handle(target));
-                pcb_queue_push(&priority_queue_array[thrd_priority(target)], target);
+            if (thrd_status(target_pcb_ptr) == THRD_STOPPED) {
+                target_pcb_ptr->status = THRD_RUNNING;
+                target_pcb_ptr->cont_signal = P_SIGCONT;
+                spthread_continue(thrd_handle(target_pcb_ptr));
+
+                spthread_disable_interrupts_self();
+                pcb_queue_push(&priority_queue_array[thrd_priority(target_pcb_ptr)], target_pcb_ptr);
+                spthread_enable_interrupts_self(); 
             }
             return 0;
         case P_SIGTERM:
-            if (thrd_status(target) != THRD_ZOMBIE) {
-                spthread_cancel(thrd_handle(target)); 
-                spthread_continue(thrd_handle(target));
-                spthread_suspend(thrd_handle(target)); 
-                target->status = THRD_ZOMBIE;
-                target->term_signal = P_SIGTERM;
-                pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(target)], pid);                
-                // need to update init PCB's child pids and child PCB's ppid to init                
-                // to do
+            if (thrd_status(target_pcb_ptr) != THRD_ZOMBIE) {
+                spthread_cancel(thrd_handle(target_pcb_ptr)); 
+                spthread_continue(thrd_handle(target_pcb_ptr));
+                spthread_suspend(thrd_handle(target_pcb_ptr)); 
+
+                spthread_disable_interrupts_self();
+                pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(target_pcb_ptr)], pid);  
+                spthread_enable_interrupts_self(); 
+
+                // update its parent's child pid, and it's child's ppid    
+                pcb_disconnect_parent_child(target_pcb_ptr);                
+                target_pcb_ptr->status = THRD_ZOMBIE;
+                target_pcb_ptr->term_signal = P_SIGTERM;
+                target_pcb_ptr->exit_code = 1;
             }
             return 0;
         default:
             /* mark zombie and cancel thread */
-            //target->status = THRD_ZOMBIE;
-            //klog("[%5d]\tSIGNALED\t%d\t%d\tprocess", cumulative_tick_global, target->pid, target->priority_level);
-            //klog("[%5d]\tZOMBIE\t%d\t%d\tprocess", cumulative_tick_global, target->pid, target->priority_level);
-            //spthread_cancel(target->thrd);
+            //target_pcb_ptr->status = THRD_ZOMBIE;
+            //klog("[%5d]\tSIGNALED\t%d\t%d\tprocess", cumulative_tick_global, target_pcb_ptr->pid, target_pcb_ptr->priority_level);
+            //klog("[%5d]\tZOMBIE\t%d\t%d\tprocess", cumulative_tick_global, target_pcb_ptr->pid, target_pcb_ptr->priority_level);
+            //spthread_cancel(target_pcb_ptr->thrd);
             /* immediate cleanup by parent if parent waiting */
             return 0;
     }    
+}
+
+void k_printprocess(void) {
+    dprintf(STDERR_FILENO, "PID\tPPID\tPRI\tSTAT\tCMD\n");
+    for (int i = 0; i < pcb_vec_len(&all_unreaped_pcb_vector); i++) {
+        print_pcb_info_single_line((&all_unreaped_pcb_vector)->pcb_ptr_array[i]);
+    } 
+}
+ 
+ /*
+void k_exit(void) {
+    pcb_t* self = k_get_self_pcb();
+    if (!self) {
+        spthread_exit(NULL);
+        return;
+    }
+
+    
+    // re-parent any live children to init (pid 1) 
+    pcb_t* curr = g_pcb_list_head;
+    while (curr) {
+        if (curr->ppid == thrd_pid(self)) {
+            curr->ppid = 1; // init
+            if (curr->status == THRD_ZOMBIE) {
+                // init immediately reaps 
+                k_proc_cleanup(curr);
+            }
+        }
+        curr = thrd_next(curr);
+    }
+
+
+    self->status = THRD_ZOMBIE;
+    extern volatile int cumulative_tick_global;
+    klog("[%5d]\tZOMBIE\t%d\t%d\tprocess", cumulative_tick_global, self->pid, self->priority_level);
+    spthread_exit(NULL);
+}
+*/
+
+void k_exit(void) {
+    pcb_t* self_pcb_ptr = k_get_self_pcb();
+    if (!self_pcb_ptr) {
+        spthread_exit(NULL);
+        return;
+    }
+    
+    spthread_disable_interrupts_self();
+    pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(self_pcb_ptr)], thrd_pid(self_pcb_ptr));
+    spthread_enable_interrupts_self(); 
+
+    // update its parent's child pid, and it's child's ppid    
+    pcb_disconnect_parent_child(self_pcb_ptr);
+    self_pcb_ptr->status = THRD_ZOMBIE;
+    self_pcb_ptr->term_signal = 0;
+    self_pcb_ptr->exit_code = 0;
+
+    extern volatile int cumulative_tick_global;
+    klog("[%5d]\tZOMBIE\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(self_pcb_ptr), thrd_priority(self_pcb_ptr));
+    spthread_exit(NULL);
+    return;
 }
 
 ///////////////////////NOT UPDATED YET FOR PCB VECTOR///////////////////////
@@ -485,48 +646,8 @@ int k_nice(pid_t pid, int priority) {
     return 0;
 }
 
-void k_printprocess(void) {
-    dprintf(STDERR_FILENO, "PID PPID PRI STAT CMD\n");
-    pcb_t* curr = g_pcb_list_head;
-    while (curr) {
-        // turn the status enum into a string
-        const char* status_str;
-        switch (thrd_status(curr)) {
-            case THRD_RUNNING: status_str = "R"; break;
-            case THRD_STOPPED: status_str = "S"; break;
-            case THRD_BLOCKED: status_str = "B"; break;
-            case THRD_ZOMBIE:  status_str = "Z"; break;
-        }
-        dprintf(STDERR_FILENO, "    %d   %d   %d   %s   %s\n", thrd_pid(curr), thrd_ppid(curr), thrd_priority(curr), status_str, thrd_CMD(curr));
-        curr = thrd_next(curr);
-    }
-}
 
-void k_exit(void) {
-    pcb_t* self = k_get_self_pcb();
-    if (!self) {
-        spthread_exit(NULL);
-        return;
-    }
 
-    extern volatile int cumulative_tick_global;
-    /* re-parent any live children to init (pid 1) */
-    pcb_t* curr = g_pcb_list_head;
-    while (curr) {
-        if (curr->ppid == thrd_pid(self)) {
-            curr->ppid = 1; // init
-            if (curr->status == THRD_ZOMBIE) {
-                /* init immediately reaps */
-                k_proc_cleanup(curr);
-            }
-        }
-        curr = thrd_next(curr);
-    }
-
-    self->status = THRD_ZOMBIE;
-    klog("[%5d]\tZOMBIE\t%d\t%d\tprocess", cumulative_tick_global, self->pid, self->priority_level);
-    spthread_exit(NULL);
-}
 
 void k_sleep([[maybe_unused]] clock_tick_t ticks) {
     // stub – feature not implemented yet

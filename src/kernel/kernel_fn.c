@@ -103,7 +103,7 @@ void pennos_kernel(void) {
     // ------ set up init thread ------ //
     spthread_t thrd_init;
     spthread_create(&thrd_init, NULL, thrd_init_fn, NULL);        
-    if (pcb_init(thrd_init, &temp_pcb_ptr, QUEUE_PRIORITY_0, pid_count++, INIT_THREAD_NAME) == -1) {
+    if (pcb_init(thrd_init, &temp_pcb_ptr, NULL, QUEUE_PRIORITY_0, pid_count++, INIT_THREAD_NAME) == -1) {
         panic("pcb_init() failed!\n");
     }
     pcb_queue_push(&priority_queue_array[QUEUE_PRIORITY_0], temp_pcb_ptr); // push to priority queue
@@ -158,8 +158,9 @@ void* thrd_init_fn([[maybe_unused]] void* arg) {
     
     // ------ set up shell thread ------ //
     spthread_t thrd_shell;
+    pcb_t* parent_pcb_ptr = k_get_self_pcb();
     spthread_create(&thrd_shell, NULL, thrd_shell_fn, NULL);        
-    if (pcb_init(thrd_shell, &temp_pcb_ptr, QUEUE_PRIORITY_0, pid_count++, SHELL_THREAD_NAME) == -1) {
+    if (pcb_init(thrd_shell, &temp_pcb_ptr, parent_pcb_ptr, QUEUE_PRIORITY_0, pid_count++, SHELL_THREAD_NAME) == -1) {
         panic("pcb_init() failed!\n");
     }    
     pcb_queue_push(&priority_queue_array[QUEUE_PRIORITY_0], temp_pcb_ptr); // push to priority queue

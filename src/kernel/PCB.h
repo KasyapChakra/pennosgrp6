@@ -45,7 +45,7 @@ typedef struct pcb_st {
     // --- status related ---
     thrd_status_t status; // 0 (running) | 1 (stopped) | 2 (blocked) | 3 (zombie)
     thrd_status_t pre_status; // only to be modified by waitpid()
-    int exit_code;
+    int exit_code; // 0 exit normally | 1 exit by SIGTERM | -1 not zombie yet
     k_signal_t term_signal;
     k_signal_t stop_signal;
     k_signal_t cont_signal;
@@ -81,10 +81,10 @@ typedef struct pcb_st {
  * @param priority_code The priority level of the PCB (0, 1, or 2).
  * @param pid The process ID for the PCB.
  */
-int pcb_init(spthread_t thread, pcb_t** result_pcb, int priority_code, pid_t pid, 
+int pcb_init(spthread_t thread, pcb_t** result_pcb, pcb_t* parent_pcb_ptr, int priority_code, pid_t pid, 
              char* command);
 
-int pcb_init_empty(pcb_t** result_pcb, int priority_code, pid_t pid);
+int pcb_init_empty(pcb_t** result_pcb, pcb_t* parent_pcb_ptr, int priority_code, pid_t pid);
 
 /**
  * This function destroys a PCB, freeing its resources when it is no longer needed.
@@ -92,6 +92,8 @@ int pcb_init_empty(pcb_t** result_pcb, int priority_code, pid_t pid);
  * @param self_ptr Pointer to the PCB to be destroyed.
  */
 void pcb_destroy(pcb_t* self_ptr);
+
+void pcb_disconnect_parent_child(pcb_t* self_ptr);
 
 /**
  * This function prints the information of a PCB to STDERR.
