@@ -80,15 +80,11 @@ static cmd_func_match_t inline_funcs[] = {{"nice", u_nice},
 /*          MAIN PROGRAM (existing content remains)             */
 /*──────────────────────────────────────────────────────────────*/
 
-#define INITIAL_BUF_LEN (4096)
 #define PROMPT "$ "
 
-static char* buf = NULL;
-static int buf_len = 0;
 static bool exit_shell = false;
 static pid_t shell_pgid; /* for signal-forwarding */
 
-static struct parsed_command* read_command();
 static pid_t process_one_command(char*** cmdv,
                                  size_t stages,
                                  const char* stdin_file,
@@ -115,7 +111,7 @@ static int open_for_write(const char* path, bool append) {
 }
 
 static pid_t spawn_stage(char** argv, int fd_in, int fd_out);
-static int open_redirect(int* fd, const char* path, int flags);
+// static int open_redirect(int* fd, const char* path, int flags);
 
 /*──────────────────────────────────────────────────────────────*/
 /*                NEW  BUILT-IN  IMPLEMENTATIONS                */
@@ -390,118 +386,90 @@ void* rm(void* arg) {
 /*      The remainder of shell.c is unchanged (↓ existing)      */
 /*──────────────────────────────────────────────────────────────*/
 
-void* shell_main(void* arg) {
-  buf_len = INITIAL_BUF_LEN;
-  buf = malloc(sizeof(char) * buf_len);
-  assert_non_null(buf, "malloc buf");
+int shell_main(struct parsed_command* cmd) {
 
-  struct parsed_command* cmd = NULL;
-
-  shell_pgid = s_getselfpid();
-  assert_non_negative(shell_pgid, "Shell PID invalid");
-  jobs_init(); /* step 6 */
-
-  while (!exit_shell) {
-    /* ── 1. reap all dead children synchronously (NOHANG) ─────────── */
-    while (s_waitpid(-1, NULL, true) > 0) /* discard status */
-      ;
-
-    free(cmd);
-
-    fprintf(stderr, PROMPT);
-    cmd = read_command();
-    if (!cmd || cmd->num_commands == 0)
-      continue;
-
-    /* ─────────────────────────────────────────────────────────────
-     *  STEP ➊ : built-ins that must run *inside* the shell (nice,
-     *           bg, fg, jobs, logout, man, …).
-     *           If the first word of the command matches one of
-     *           those, execute it synchronously and go back to the
-     *           prompt – no pipes, no redirections, no child proc.     *
-     * ────────────────────────────────────────────────────────────*/
-    {
-      char** argv0 = cmd->commands[0]; /* words of 1st stage */
-      thd_func_t inl = get_func_from_cmd(argv0[0], inline_funcs);
-      if (inl) {    /* found a shell-local built-in */
-        inl(argv0); /* run it right here            */
-        continue;   /* prompt user again            */
-      }
-    }
-
-    /* ────────────────────────────────────────────────────────────
-     *  From here on we know the command is *not* shell-local, so
-     *  we treat it like an external pipeline: handle < > >> and
-     *  possibly create one or many child processes.
-     * ────────────────────────────────────────────────────────────*/
-
-    /*----------------------------------------------*
-     *  Handle <  >  >>  from the parsed structure  *
-     *----------------------------------------------*/
-    int redir_in = STDIN_FILENO; /* default: inherit from shell */
-    int redir_out = STDOUT_FILENO;
-    bool close_in = false; /* whether we must k_close later */
-    bool close_out = false;
-
-    /* open input redirection, if any */
-    if (cmd->stdin_file) {
-      int fd = open_for_read(cmd->stdin_file);
-      if (fd < 0) {
-        fprintf(stderr, "shell: cannot open %s for reading\n", cmd->stdin_file);
-        goto AFTER_LOOP_CLEANUP;
-      }
-      redir_in = fd;
-      close_in = true;
-    }
-
-    /* open output redirection, if any */
-    if (cmd->stdout_file) {
-      int fd = open_for_write(cmd->stdout_file, cmd->is_file_append);
-      if (fd < 0) {
-        fprintf(stderr, "shell: cannot open %s (%s)\n", cmd->stdout_file,
-                PennFatErr_toErrString(fd));
-        if (close_in)
-          s_close(redir_in);
-        goto AFTER_LOOP_CLEANUP;
-      }
-      redir_out = fd;
-      close_out = true;
-    }
-
-    pid_t child_pid = process_one_command(
-        cmd->commands, cmd->num_commands, cmd->stdin_file, cmd->stdout_file,
-        /* stderr */ NULL, cmd->is_file_append);
-
-    if (child_pid <= 0)
-      continue;
-
-    if (!cmd->is_background) { /* foreground job           */
-      s_tcsetpid(child_pid);
-      s_waitpid(child_pid, NULL, false);
-      s_tcsetpid(shell_pgid);
-    } else {
-      /* TODO: store background job info */
-    }
-
-    if (close_in)
-      s_close(redir_in);
-    if (close_out)
-      s_close(redir_out);
-
-  AFTER_LOOP_CLEANUP:; /* empty statement so the label isn’t alone */
+  /* ─────────────────────────────────────────────────────────────
+    *  STEP ➊ : built-ins that must run *inside* the shell (nice,
+    *           bg, fg, jobs, logout, man, …).
+    *           If the first word of the command matches one of
+    *           those, execute it synchronously and go back to the
+    *           prompt – no pipes, no redirections, no child proc.     *
+    * ────────────────────────────────────────────────────────────*/
+  char** argv0 = cmd->commands[0]; /* words of 1st stage */
+  thd_func_t inl = get_func_from_cmd(argv0[0], inline_funcs);
+  if (inl) {    /* found a shell-local built-in */
+    inl(argv0); /* run it right here            */
+    return 0;   /* prompt user again            */
   }
 
-  if (cmd)
-    free(cmd); /* guard against the last continue */
+  /* ────────────────────────────────────────────────────────────
+    *  From here on we know the command is *not* shell-local, so
+    *  we treat it like an external pipeline: handle < > >> and
+    *  possibly create one or many child processes.
+    * ────────────────────────────────────────────────────────────*/
 
-  free(buf);
+  /*----------------------------------------------*
+    *  Handle <  >  >>  from the parsed structure  *
+    *----------------------------------------------*/
+  int redir_in = STDIN_FILENO; /* default: inherit from shell */
+  int redir_out = STDOUT_FILENO;
+  bool close_in = false; /* whether we must k_close later */
+  bool close_out = false;
 
-  jobs_shutdown();
+  /* open input redirection, if any */
+  if (cmd->stdin_file) {
+    int fd = open_for_read(cmd->stdin_file);
+    if (fd < 0) {
+      dprintf(STDERR_FILENO, "shell: cannot open %s for reading\n", cmd->stdin_file);
+      goto AFTER_LOOP_CLEANUP;
+    }
+    redir_in = fd;
+    close_in = true;
+  }
 
-  fprintf(stderr, "Shell exits\n");
-  /* let the wrapper do the bookkeeping (k_exit) */
-  return NULL;
+  /* open output redirection, if any */
+  if (cmd->stdout_file) {
+    int fd = open_for_write(cmd->stdout_file, cmd->is_file_append);
+    if (fd < 0) {
+      dprintf(STDERR_FILENO, "shell: cannot open %s (%s)\n", cmd->stdout_file,
+              PennFatErr_toErrString(fd));
+      if (close_in)
+        s_close(redir_in);
+      goto AFTER_LOOP_CLEANUP;
+    }
+    redir_out = fd;
+    close_out = true;
+  }
+
+  pid_t child_pid = process_one_command(
+      cmd->commands, cmd->num_commands, cmd->stdin_file, cmd->stdout_file,
+      /* stderr */ NULL, cmd->is_file_append);
+
+  if (child_pid <= 0)
+    return -1;
+
+  if (!cmd->is_background) { /* foreground job           */
+    dprintf(STDERR_FILENO, "shell_main: TODO: Should be waiting\n");
+    // s_tcsetpid(child_pid);  
+    // s_waitpid(child_pid, NULL, false); //TODO: Wait_pid not working
+    // waits infinitely, even when the child should have exited
+    // s_tcsetpid(shell_pgid);
+  } else {
+    /* TODO: store background job info */
+  }
+
+  if (close_in)
+    s_close(redir_in);
+  if (close_out)
+    s_close(redir_out);
+
+  AFTER_LOOP_CLEANUP:; /* empty statement so the label isn’t alone */
+
+  return 0; /* prompt user again */
 }
+
+
+
 /* Existing built-ins (busy / kill / ps / testing helpers) remain unchanged */
 /* … (the rest of the original file’s content is intentionally left intact) */
 
@@ -733,64 +701,6 @@ void* orphanify(void* arg) {
 /******************************************
  *       internal help functions          *
  ******************************************/
-
-static struct parsed_command* read_command() {
-  /* … unchanged … */
-  /* (full body remains exactly as in your previous version) */
-  /* ------------------------------------------------------- */
-  // read user input
-  ssize_t bytes_read;
-
-  fprintf(stderr, "\033[1m");
-  errno = 0; /* keep EINTR       */
-  bytes_read = read(STDIN_FILENO, buf, buf_len - 1);
-  fprintf(stderr, "\033[0m");
-
-  if (bytes_read >= 0) {
-    buf[bytes_read] = '\0';
-  }
-
-  /* reaching EOF (and just CTRL-D in terminal) */
-  if (bytes_read == 0) {
-    fprintf(stderr, "\n");
-    exit_shell = true;
-    return NULL;  // success
-  }
-
-  /* having error */
-  if (bytes_read < 0) {
-    /* interrupted by signal */
-    if (errno == EINTR) {
-      return NULL;
-    }
-    perror("shell_loop: error read input");
-    exit_shell = true;
-    return NULL;  // failure
-  }
-
-  /* empty line */
-  if (bytes_read == 1 && buf[bytes_read - 1] == '\n') {
-    return NULL;
-  }
-
-  /* parse command */
-  struct parsed_command* pcmd_ptr = NULL;
-  int parse_ret = parse_command(buf, &pcmd_ptr);
-  if (parse_ret != 0) {
-    /* invalid command */
-    print_parser_errcode(stderr, parse_ret);
-    fprintf(stderr, "ERR: invalid user command\n");
-    free(pcmd_ptr);
-    return NULL;
-  }
-
-  if (pcmd_ptr->num_commands == 0) {
-    free(pcmd_ptr);
-    return NULL;
-  }
-
-  return pcmd_ptr;
-}
 
 /*  NEW built-ins: jobs / bg / fg / logout – step 7               */
 void* jobs_builtin(void* arg) {

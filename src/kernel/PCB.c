@@ -166,6 +166,7 @@ int pcb_remove_child_pid(pcb_t* self_ptr, pid_t pid) {
 
 void print_pcb_info(pcb_t* self_ptr) {
     dprintf(STDERR_FILENO, "\t------ Print PCB info ------\n");
+    dprintf(STDERR_FILENO, "\tThread CMD: %s\n", thrd_CMD(self_ptr));
     dprintf(STDERR_FILENO, "\tThread PID: %d\n", thrd_pid(self_ptr));
     dprintf(STDERR_FILENO, "\tThread PGID: %d\n", thrd_pgid(self_ptr));
     dprintf(STDERR_FILENO, "\tThread PPID: %d\n", thrd_ppid(self_ptr));    

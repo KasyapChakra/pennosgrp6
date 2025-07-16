@@ -28,6 +28,7 @@
 #include <pthread.h>
 
 
+
 volatile pid_t pid_count;
 volatile bool pennos_done;
 volatile k_errno_t k_errno;
@@ -37,6 +38,9 @@ volatile k_errno_t k_errno;
 
 pcb_queue_t priority_queue_array[NUM_PRIORITY_QUEUES]; 
 
+pcb_queue_t blocked_queue; // queue of blocked/sleeping threads
+pcb_queue_t stopped_queue; // queue of stopped threads
+// this vector holds all the PCBs (threads) that have not been reaped
 pcb_vec_t all_unreaped_pcb_vector;
 
 
@@ -84,11 +88,13 @@ void pennos_kernel(void) {
     // pid_count starts at 1 because init thread is the 1st thread
     pid_count = 1;    
 
-    // initialize 3 Round Robin queues with different priority
+    // initialize 3 Round Robin queues for RUNNING threads, plus blocked queue
     for (int i = 0; i < NUM_PRIORITY_QUEUES; i++) {
         priority_queue_array[i] = pcb_queue_init(i); // need to be destroyed later
     }  
 
+    blocked_queue = pcb_queue_init(QUEUE_BLOCKED);
+    stopped_queue = pcb_queue_init(QUEUE_STOPPED);
     // initialize PCB vector to hold all unreaped PCBs
     all_unreaped_pcb_vector = pcb_vec_new(0, pcb_destroy); // need to be destroyed later 
     
@@ -166,25 +172,25 @@ void* thrd_init_fn([[maybe_unused]] void* arg) {
     
     // test threads for the 3 queues
     
-    spthread_t temp_spthread;  
+    // spthread_t temp_spthread;  
 
     // test thread for queue 0
-    spthread_create(&temp_spthread, NULL, thrd_print_p0, NULL);    
-    pcb_init(temp_spthread, &temp_pcb_ptr, 0, pid_count++, "Test1");
-    pcb_queue_push(&priority_queue_array[0], temp_pcb_ptr);
-    k_register_pcb(temp_pcb_ptr);
+    // spthread_create(&temp_spthread, NULL, thrd_print_p0, NULL);    
+    // pcb_init(temp_spthread, &temp_pcb_ptr, 0, pid_count++, "Test1");
+    // pcb_queue_push(&priority_queue_array[0], temp_pcb_ptr);
+    // k_register_pcb(temp_pcb_ptr);
        
-    // test thread for queue 1
-    spthread_create(&temp_spthread, NULL, thrd_print_p1, NULL);    
-    pcb_init(temp_spthread, &temp_pcb_ptr, 1, pid_count++, "Test2");
-    pcb_queue_push(&priority_queue_array[1], temp_pcb_ptr);
-    k_register_pcb(temp_pcb_ptr);
+    // // test thread for queue 1
+    // spthread_create(&temp_spthread, NULL, thrd_print_p1, NULL);    
+    // pcb_init(temp_spthread, &temp_pcb_ptr, 1, pid_count++, "Test2");
+    // pcb_queue_push(&priority_queue_array[1], temp_pcb_ptr);
+    // k_register_pcb(temp_pcb_ptr);
         
-    // test thread for queue 2
-    spthread_create(&temp_spthread, NULL, thrd_print_p2, NULL);    
-    pcb_init(temp_spthread, &temp_pcb_ptr, 2, pid_count++, "Test3");  
-    pcb_queue_push(&priority_queue_array[2], temp_pcb_ptr);      
-    k_register_pcb(temp_pcb_ptr);
+    // // test thread for queue 2
+    // spthread_create(&temp_spthread, NULL, thrd_print_p2, NULL);    
+    // pcb_init(temp_spthread, &temp_pcb_ptr, 2, pid_count++, "Test3");  
+    // pcb_queue_push(&priority_queue_array[2], temp_pcb_ptr);      
+    // k_register_pcb(temp_pcb_ptr);
 
     // print info for the 3 queues for debug ///////////////////
     print_queue_info(&priority_queue_array[0]);
@@ -194,7 +200,6 @@ void* thrd_init_fn([[maybe_unused]] void* arg) {
 
     ///////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////  
-
 
     pcb_t* self_pcb_ptr = k_get_self_pcb();
     self_pcb_ptr->status = THRD_BLOCKED; // modify self status to BLOCKED as it will block and wait for shell to join

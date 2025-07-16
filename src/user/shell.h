@@ -1,5 +1,6 @@
 #ifndef USER_SHELL_H_
 #define USER_SHELL_H_
+#include "../util/parser.h"
 
 /*****************************************
  *          MAIN PROGRAM                 *
@@ -11,7 +12,7 @@
 
 
 
-void *shell_main(void *arg);
+int shell_main(struct parsed_command* cmd);
 
 /******************************************
  *     INDEPENDENT BUILT-INS              *
