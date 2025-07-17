@@ -918,6 +918,13 @@ void k_exit(void) {
     return;
 }
 
+
+void k_sleep([[maybe_unused]] clock_tick_t ticks) {
+    
+    (void)ticks;
+}
+
+
 ///////////////////////NOT UPDATED YET FOR PCB VECTOR///////////////////////
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
@@ -964,10 +971,7 @@ int k_nice(pid_t pid, int priority) {
 
 
 
-void k_sleep([[maybe_unused]] clock_tick_t ticks) {
-    // stub – feature not implemented yet
-    (void)ticks;
-}
+
 
 int k_pipe([[maybe_unused]] int fds[2]) {
     return -1; // not implemented yet
