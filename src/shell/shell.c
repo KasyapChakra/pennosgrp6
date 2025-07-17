@@ -209,9 +209,9 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
         // support experimental commands. TODO eventually add them to the user/shell.c
         bool is_experimental_cmd = false;
         if (strcmp(pcmd_ptr->commands[0][0], "ps") == 0) {
-            s_spawn(ps_builtin, NULL, -1, -1);
-            //pid_t temp_pid = s_spawn(ps_builtin, NULL, -1, -1);
-            //s_waitpid(temp_pid, NULL, false);
+            //s_spawn(ps_builtin, NULL, -1, -1);
+            pid_t temp_pid = s_spawn(ps_builtin, NULL, -1, -1);
+            s_waitpid(temp_pid, NULL, false);
             is_experimental_cmd = true;
         } else if (strcmp(pcmd_ptr->commands[0][0], "pcbvec") == 0) {
             print_pcb_vec_info(&all_unreaped_pcb_vector);

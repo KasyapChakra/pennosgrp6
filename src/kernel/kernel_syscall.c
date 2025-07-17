@@ -652,18 +652,18 @@ pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
         spthread_enable_interrupts_self();    
 
         // get exit info
-        if (curr_pcb_ptr->term_signal == 0) {
-            // exited normally            
-            *wstatus = curr_pcb_ptr->exit_code << 8; 
-            
-        } else {
-            // terminated by signal
-            if (curr_pcb_ptr->term_signal != P_SIGTERM) {
-                panic("Thread was terminated but not by P_SIGTERM!\n");
-            }            
-            *wstatus = curr_pcb_ptr->term_signal;
-            
-        }                 
+        if (wstatus != NULL) {
+            if (curr_pcb_ptr->term_signal == 0) {
+                // exited normally              
+                *wstatus = curr_pcb_ptr->exit_code << 8;                             
+            } else {
+                // terminated by signal
+                if (curr_pcb_ptr->term_signal != P_SIGTERM) {
+                    panic("Thread was terminated but not by P_SIGTERM!\n");
+                }            
+                *wstatus = curr_pcb_ptr->term_signal;        
+            }                 
+        }
 
         pid_t result_pid = thrd_pid(curr_pcb_ptr);                                  
         pcb_destroy(curr_pcb_ptr); 
@@ -841,13 +841,14 @@ int k_kill(pid_t pid, k_signal_t sig) {
                 spthread_cancel(thrd_handle(target_pcb_ptr)); 
                 //spthread_continue(thrd_handle(target_pcb_ptr)); // this code is needed acording to the demo
                 //spthread_suspend(thrd_handle(target_pcb_ptr)); // this code is needed acording to the demo
-                pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(target_pcb_ptr)], pid);  
-
-                // update its parent's child pid, and it's child's ppid    
-                pcb_disconnect_parent_child(target_pcb_ptr);                
                 target_pcb_ptr->status = THRD_ZOMBIE;
                 target_pcb_ptr->term_signal = P_SIGTERM;
                 target_pcb_ptr->exit_code = 1;
+                pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(target_pcb_ptr)], pid);  
+
+                // update its parent's child pid, and it's child's ppid    
+                //pcb_disconnect_parent_child(target_pcb_ptr);                
+
                 spthread_enable_interrupts_self(); 
             }
             return 0;
@@ -902,14 +903,14 @@ void k_exit(void) {
     }
     
     spthread_disable_interrupts_self();
+    self_pcb_ptr->status = THRD_ZOMBIE;
+    self_pcb_ptr->term_signal = 0;
+    self_pcb_ptr->exit_code = 0;    
     pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(self_pcb_ptr)], thrd_pid(self_pcb_ptr));
     spthread_enable_interrupts_self(); 
 
     // update its parent's child pid, and it's child's ppid    
     pcb_disconnect_parent_child(self_pcb_ptr);
-    self_pcb_ptr->status = THRD_ZOMBIE;
-    self_pcb_ptr->term_signal = 0;
-    self_pcb_ptr->exit_code = 0;
 
     extern volatile int cumulative_tick_global;
     klog("[%5d]\tZOMBIE\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(self_pcb_ptr), thrd_priority(self_pcb_ptr));
