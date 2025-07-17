@@ -131,7 +131,7 @@ pcb_t* k_proc_create(pcb_t* parent, int priority_code) {
 
 pcb_t* k_proc_create(pcb_t* parent_pcb_ptr, int priority_code) {
     pcb_t* pcb_ptr;
-    spthread_disable_interrupts_self();    
+    spthread_disable_interrupts_self();   
     if (pcb_init_empty(&pcb_ptr, parent_pcb_ptr, priority_code, pid_count++) == -1) {
         panic("pcb_init() failed!\n");
     }
@@ -284,8 +284,13 @@ static int set_routine_and_run_helper(pcb_t* proc,
   const char* process_name = "ps";
   if (proc->pid == INIT_PID) {
     process_name = INIT_PROCESS_NAME;
-  } else if (wrap_exit && arg && looks_like_cstring(((char**)arg)[0])) {
-    process_name = ((char**)arg)[0];
+  } else if (wrap_exit && arg) {
+    // When wrap_exit is true, arg is a routine_exit_wrapper_args_t*
+    routine_exit_wrapper_args_t* wrapped_args = (routine_exit_wrapper_args_t*)arg;
+    char** maybe_argv = (char**)wrapped_args->real_arg;
+    if (maybe_argv && looks_like_cstring(maybe_argv[0])) {
+      process_name = maybe_argv[0];
+    }
   } else if (func == spawn_entry_wrapper_kernel && arg) {
     syscall_spawn_arg* sw = (syscall_spawn_arg*)arg;
     if (sw->fd0 >= 0 && sw->fd0 != STDIN_FILENO) {
