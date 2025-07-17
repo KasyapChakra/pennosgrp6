@@ -119,6 +119,63 @@ int k_touch(const char* fname);
 int k_ls(const char* fname);
 int k_chmod(const char* fname, unsigned char perm);
 */
+// ───────── wrapper‐exit & spawn‐wrapper helpers ─────────
+/**
+ * Arguments struct for routine_exit_wrapper_func:
+ *   holds the real function pointer and its argument.
+ */
+typedef struct routine_exit_wrapper_args {
+  void* (*real_func)(void*);
+  void* real_arg;
+} routine_exit_wrapper_args_t;
+
+/**
+ * Allocate and initialize a wrapper_args struct so that
+ * routine_exit_wrapper_func can invoke real_func(arg) and then
+ * perform cleanup.
+ */
+routine_exit_wrapper_args_t* wrap_routine_exit_args(void* (*real_func)(void*),
+                                                    void* real_arg);
+
+/**
+ * Thread entry point you pass to spthread_create when you
+ * want to “wrap” exit.  It unpacks a routine_exit_wrapper_args_t,
+ * calls real_func(arg), then does any bookkeeping.
+ */
+void* routine_exit_wrapper_func(void* wrapper_args);
+/**
+ * Argument struct for spawn_entry_wrapper:
+ * wraps the “real” argument pointer so we can unpack it.
+ */
+typedef struct kernel_spawn_wrapper_arg {
+  void* (*real_func)(void*);
+  void* real_arg;
+} kernel_spawn_wrapper_arg;
+
+/**
+ * A generic spawn‐entry wrapper: you can log argv[0] or
+ * set up any special state before handing off to the real func.
+ */
+void* spawn_entry_wrapper_kernel(void* wrapper_args);
+
+/**
+ * Quick sanity‐check to see if a pointer really looks like
+ * a NULL‐terminated C string.
+ */
+bool looks_like_cstring(const char* s);
+
+// ───────── init process naming & lifecycle logging ─────────
+/** PID and name for the “init” process **/
+#define INIT_PID 1
+#define INIT_PROCESS_NAME "INIT"
+
+
+void set_process_name(pcb_t* proc, const char* name);
+
+/**
+ * Emit a lifecycle event for a PCB, e.g. CREATED, ZOMBIE, etc.
+ */
+void lifecycle_event_log(pcb_t* proc, const char* event, void* info);
 
 
 

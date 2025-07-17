@@ -276,5 +276,75 @@ void* thrd_print_p2([[maybe_unused]] void* arg) {
     }
     return NULL;
 }
+/**
+ * Build a wrapper‐args object so routine_exit_wrapper_func can
+ * call real_func(real_arg) then do cleanup.
+ */
+routine_exit_wrapper_args_t* wrap_routine_exit_args(void* (*real_func)(void*),
+                                                    void* real_arg) {
+  routine_exit_wrapper_args_t* args = malloc(sizeof(*args));
+  if (!args) {
+    panic("wrap_routine_exit_args: malloc failed\n");
+  }
+  args->real_func = real_func;
+  args->real_arg = real_arg;
+  return args;
+}
+
+/**
+ * Entry point that wraps exit.  Calls the real function and then
+ * (for example) invokes k_exit().
+ */
+void* routine_exit_wrapper_func(void* wrapper_args) {
+  routine_exit_wrapper_args_t* args = wrapper_args;
+  void* result = args->real_func(args->real_arg);
+  free(args);
+  // after real_func returns, clean up this thread
+  k_exit();
+  return result;
+}
+
+/**
+ * A generic spawn wrapper: unpacks spawn_wrapper_arg, then
+ * calls the real thread‐function.
+ */
+void* spawn_entry_wrapper_kernel(void* wrapper_args) {
+  kernel_spawn_wrapper_arg* sw = (kernel_spawn_wrapper_arg*)wrapper_args;
+  // call the real function
+  void* retval = sw->real_func(sw->real_arg);
+  // thread will clean itself up, or you can call k_exit() here
+  return retval;
+}
+
+/**
+ * Heuristic: true if s points to a valid zero‐terminated C string.
+ */
+bool looks_like_cstring(const char* s) {
+  if (!s)
+    return false;
+  size_t i = 0;
+  // scan up to some reasonable max (avoid endless loop)
+  while (i < 1024 && s[i]) {
+    i++;
+  }
+  return (i < 1024);
+}
+
+/**
+ * Set the PCB’s human‐readable name (e.g. for a `ps` listing).
+ */
+void set_process_name(pcb_t* proc, const char* name) {
+  proc->command = (char*)name;
+}
+
+/**
+ * Log a lifecycle event with your klogger:
+ * e.g. "[  123]    CREATED    42    1    process"
+ */
+void lifecycle_event_log(pcb_t* proc, const char* event, void* info) {
+  extern volatile int cumulative_tick_global;
+  klog("[%5d]\t%s\t%d\t%d\tprocess", cumulative_tick_global, event,
+       thrd_pid(proc), thrd_priority(proc));
+}
 
 
