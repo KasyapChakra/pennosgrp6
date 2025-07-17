@@ -15,6 +15,7 @@
 #include "./spthread.h"
 #include "./kernel_definition.h"
 
+
 #define NUM_CHILDREN_MAX 128
 
 typedef enum {
@@ -114,6 +115,8 @@ void reset_pcb_status_signal(pcb_t* pcb_ptr);
 int pcb_add_child_pid(pcb_t* self_ptr, pid_t pid);
 
 int pcb_remove_child_pid(pcb_t* self_ptr, pid_t pid);
+
+
 
 
 

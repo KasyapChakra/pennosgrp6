@@ -123,6 +123,20 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
                 continue;
             }
             curr_pcb_ptr = queue_head(curr_queue_ptr);
+            ////////////////////////////////////////////////////////////////////
+            // make sure scheduler only continues a runnable thread
+            while ((curr_pcb_ptr != NULL) && (thrd_status(curr_pcb_ptr) != THRD_RUNNING)) {
+                // not a runnable thread ==> pop it out of the queue and move to the new head of the same queue
+                pcb_queue_pop(curr_queue_ptr);
+                curr_pcb_ptr = queue_head(curr_queue_ptr);
+            }
+            if (curr_pcb_ptr == NULL) {
+                // now the queue is empty
+                spthread_enable_interrupts_self(); // protection OFF
+                continue;                
+            }
+            ////////////////////////////////////////////////////////////////////
+            // now we have a runnable thread from this queue
             spthread_continue(thrd_handle(curr_pcb_ptr));
             spthread_enable_interrupts_self(); // protection OFF
 
@@ -138,10 +152,13 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
 
             sigsuspend(&sig_set_ex_sigalrm);    
 
-            spthread_disable_interrupts_self(); // protection ON                    
-            spthread_suspend(thrd_handle(curr_pcb_ptr));
-            curr_pcb_ptr = pcb_queue_pop(curr_queue_ptr);
-            pcb_queue_push(curr_queue_ptr, curr_pcb_ptr);
+            spthread_disable_interrupts_self(); // protection ON  
+            curr_pcb_ptr = pcb_queue_pop(curr_queue_ptr);            
+            if (thrd_status(curr_pcb_ptr) == THRD_RUNNING) {
+                // only suspend and push back to priority queue if the thread status is still RUNNING
+                spthread_suspend(thrd_handle(curr_pcb_ptr));                
+                pcb_queue_push(curr_queue_ptr, curr_pcb_ptr);    
+            }            
             spthread_enable_interrupts_self(); // protection OFF
 
         }

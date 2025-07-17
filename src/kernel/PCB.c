@@ -87,9 +87,7 @@ void pcb_disconnect_parent_child(pcb_t* self_ptr) {
     pcb_t* parent_pcb_ptr = pcb_vec_seek_pcb_by_pid(&all_unreaped_pcb_vector, thrd_ppid(self_ptr)); 
 
     if (parent_pcb_ptr != NULL) {
-        if (pcb_remove_child_pid(parent_pcb_ptr, thrd_pid(self_ptr)) == -1) {
-            panic("pcb_disconnect_parent_child() failed to update parent child info");
-        }
+        pcb_remove_child_pid(parent_pcb_ptr, thrd_pid(self_ptr));
     }
 
     // handle child (if exists) PCB's parent pid info
@@ -97,8 +95,10 @@ void pcb_disconnect_parent_child(pcb_t* self_ptr) {
         pcb_t* child_pcb_ptr = pcb_vec_seek_pcb_by_pid(&all_unreaped_pcb_vector, self_ptr->child_pids[i]);
         if (child_pcb_ptr != NULL) {
             child_pcb_ptr->ppid = 1; // assign child parent to init (pid = 1)            
-        }    
+        }   
+        self_ptr->child_pids[i] = -1;
     }
+    self_ptr->num_child_pids = 0;
 }
 
 void pcb_destroy(pcb_t* self_ptr) {
@@ -166,6 +166,8 @@ int pcb_remove_child_pid(pcb_t* self_ptr, pid_t pid) {
     self_ptr->num_child_pids--;
     return 0;
 }
+
+
 
 
 void print_pcb_info(pcb_t* self_ptr) {

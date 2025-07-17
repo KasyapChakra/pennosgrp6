@@ -149,7 +149,10 @@ void pcb_vec_erase(pcb_vec_t* self, size_t index, bool is_destroy) {
     panic("pcb_vec_erase(): Index value out of range (>= vec_len)!\n");
   }
 
-  // If there exists element destructor function, call it for the element erased
+  // There exists element destructor function 
+  // +)
+  // is_destroy flag is true
+  // ==> destroy the erased element
   if ((self->pcb_dtor_fn != NULL) && (is_destroy)) {
     self->pcb_dtor_fn(self->pcb_ptr_array[index]);
   }
@@ -184,6 +187,8 @@ int pcb_vec_remove_by_pcb(pcb_vec_t* self, pcb_t* target_pcb_ptr) {
     return -1; // fail to find the target pcb
   }
 
+  // remove the PCB from pcb_vec
+  // BUT do not destroy the PCB
   pcb_vec_erase(self, index, false);
   return 0;
 }
