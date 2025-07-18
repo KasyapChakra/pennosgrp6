@@ -8,7 +8,6 @@
 #include "jobs.h"
 #include "../shell/shell.h"  // Include to access current_fg_pid
 #include "syscall_kernel.h"  // Include to access s_sleep and other syscalls
-#include "../kernel/spthread.h"  // Include for spthread interrupt control
 
 #include "../common/pennfat_definitions.h"
 #include "../internal/pennfat_kernel.h"
@@ -18,6 +17,60 @@
 #include <stdlib.h>  // NULL, atoi
 #include <string.h>
 #include <unistd.h>  // STDIN_FILENO / read
+
+// Process status macros
+#ifndef P_WIFEXITED
+#define P_WIFEXITED(status) (((status) & 0x7f) == 0)
+#endif
+#ifndef P_WIFSTOPPED
+#define P_WIFSTOPPED(status) (((status) & 0xff) == 0x7f)
+#endif
+#ifndef P_WIFSIGNALED
+#define P_WIFSIGNALED(status) (((status) & 0x7f) != 0 && ((status) & 0x7f) != 0x7f)
+#endif
+
+// File system constants
+#ifndef F_SEEK_SET
+#define F_SEEK_SET 0
+#endif
+#ifndef F_SEEK_CUR
+#define F_SEEK_CUR 1
+#endif
+#ifndef F_SEEK_END
+#define F_SEEK_END 2
+#endif
+
+// Error handling
+#ifndef P_ERRNO
+extern int P_ERRNO;
+#endif
+
+// File system system calls
+#ifndef s_open
+int s_open(const char *fname, int mode);
+int s_read(int fd, int n, char *buf);
+int s_write(int fd, const char *str, int n);
+int s_close(int fd);
+int s_unlink(const char *fname);
+int s_lseek(int fd, int offset, int whence);
+int s_ls(const char *filename);
+#endif
+
+// Process system calls
+#ifndef s_spawn
+pid_t s_spawn(void* (*func)(void*), char *argv[], int fd0, int fd1);
+pid_t s_waitpid(pid_t pid, int* wstatus, bool nohang);
+int s_kill(pid_t pid, int signal);
+void s_exit(void);
+int s_nice(pid_t pid, int priority);
+void s_sleep(unsigned int ticks);
+int s_printprocess(void);
+#endif
+
+// Error handling function
+#ifndef u_perror
+void u_perror(const char *s);
+#endif
 
 /* ---------- forward-declarations for built-ins used below ---------- */
 void* jobs_builtin(void*);
@@ -500,60 +553,32 @@ void* ps(void* arg) {
 }
 
 void* busy(void* arg) {
-  // Pure computational busy loop - no system calls, no sleeps
-  // This should be CPU intensive but allow PennOS scheduler to preempt normally
-  volatile unsigned long long counter = 0;
-  volatile unsigned long long work_result = 0;
+  // Simple but CPU-intensive loop that allows scheduler preemption
+  volatile unsigned long counter = 0;
+  volatile unsigned long result = 1;
   
   while (true) {
-    // Phase 1: Pure mathematical computation
-    for (int i = 0; i < 10000; i++) {
+    // Do CPU-intensive mathematical operations
+    for (int i = 0; i < 50000; i++) {
       counter++;
-      work_result += counter * counter;
-      work_result ^= counter;
-      work_result = (work_result << 1) ^ (work_result >> 31);
-    }
-    
-    // Phase 2: Memory access patterns
-    volatile int temp_array[100];
-    for (int j = 0; j < 100; j++) {
-      temp_array[j] = (int)(counter + j);
-      work_result += temp_array[j];
-    }
-    
-    // Phase 3: More computation with branching
-    for (int k = 0; k < 1000; k++) {
-      if (counter % 2 == 0) {
-        work_result += k * 3;
-      } else {
-        work_result -= k * 2;
-      }
+      result *= counter;
+      result ^= counter;
+      result += counter * counter;
       
-      // Simulate some complex calculation
-      volatile int temp = k;
-      temp = temp * temp + k;
-      temp = temp % 997; // Some prime number operations
-      work_result ^= temp;
+      // Add some memory operations
+      if (counter % 1000 == 0) {
+        volatile int temp_data[50];
+        for (int j = 0; j < 50; j++) {
+          temp_data[j] = counter + j;
+          result += temp_data[j];
+        }
+      }
     }
     
-    // Phase 4: String/character operations
-    volatile char str_buffer[256];
-    for (int m = 0; m < 256; m++) {
-      str_buffer[m] = (char)((counter + m) % 256);
-      work_result += str_buffer[m];
-    }
-    
-    // Phase 5: Floating point operations (if available)
-    volatile double float_result = 1.0;
-    for (int n = 0; n < 100; n++) {
-      float_result *= 1.1;
-      float_result /= 1.05;
-      work_result += (unsigned long long)float_result;
-    }
-    
-    // Prevent compiler optimization
-    if (work_result == 0x123456789ABCDEF0ULL) {
-      break; // This will never happen, but prevents optimization
+    // Reset to prevent overflow and keep working
+    if (counter > 1000000) {
+      counter = 0;
+      result = 1;
     }
   }
   
