@@ -635,26 +635,33 @@ pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
 
         // calling thread block and wait
         spthread_join(thrd_handle(curr_pcb_ptr), NULL);
-
+        
         spthread_disable_interrupts_self();
         // manage waitpid calling thread status
-        self_pcb_ptr->status = THRD_RUNNING;    
+        self_pcb_ptr->status = THRD_RUNNING; 
         if (!pcb_in_prio_queue(self_pcb_ptr, &priority_queue_array[thrd_priority(self_pcb_ptr)])) {
             // waitpid calling thread PCB not in priority queue 
-            // ==> push back calling thread into priority queue and self suspend
-            pcb_queue_push(&priority_queue_array[thrd_priority(self_pcb_ptr)], self_pcb_ptr);
+            // ==> self suspend
+            //pcb_queue_push(&priority_queue_array[thrd_priority(self_pcb_ptr)], self_pcb_ptr); //old code            
+            spthread_enable_interrupts_self();
             spthread_suspend_self();
         }        
         spthread_enable_interrupts_self();    
         // ----------------------------------------- //
 
         // ------ child thread has ***joined***, get its exit info and clean up its PCB ------ //
-        spthread_disable_interrupts_self();
+        // double check
+        if (thrd_status(curr_pcb_ptr) != THRD_ZOMBIE) {
+            panic("The child thread being reaped is not a zombie?!\n");
+        }
+        curr_pcb_ptr->status = THRD_REAPED;
+
+        // spthread_disable_interrupts_self();
         // pop out from priority queue (if still in it)
-        pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(curr_pcb_ptr)], thrd_pid(curr_pcb_ptr));                
+        // pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(curr_pcb_ptr)], thrd_pid(curr_pcb_ptr));                
         // remove from pcb vector
-        pcb_vec_remove_by_pcb(&all_unreaped_pcb_vector, curr_pcb_ptr);                        
-        spthread_enable_interrupts_self();    
+        // pcb_vec_remove_by_pcb(&all_unreaped_pcb_vector, curr_pcb_ptr);                        
+        // spthread_enable_interrupts_self();    
 
         // get exit info
         if (wstatus != NULL) {
@@ -671,7 +678,7 @@ pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
         }
 
         pid_t result_pid = thrd_pid(curr_pcb_ptr);                                  
-        pcb_destroy(curr_pcb_ptr); 
+        //pcb_destroy(curr_pcb_ptr);         
 
         return result_pid;           
     }
@@ -823,7 +830,7 @@ int k_kill(pid_t pid, k_signal_t sig) {
             if (thrd_status(target_pcb_ptr) == THRD_RUNNING) {            
                 spthread_disable_interrupts_self();
                 spthread_suspend(thrd_handle(target_pcb_ptr));
-                pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(target_pcb_ptr)], pid); 
+                //pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(target_pcb_ptr)], pid); 
                 target_pcb_ptr->status = THRD_STOPPED;
                 target_pcb_ptr->stop_signal = P_SIGSTOP;                               
                 spthread_enable_interrupts_self();      
@@ -836,7 +843,7 @@ int k_kill(pid_t pid, k_signal_t sig) {
                 target_pcb_ptr->cont_signal = P_SIGCONT;
                 // spthread_continue(thrd_handle(target_pcb_ptr)); 
                 // --> no need to manually continue the thread, just push to the priority queue            
-                pcb_queue_push(&priority_queue_array[thrd_priority(target_pcb_ptr)], target_pcb_ptr);
+                //pcb_queue_push(&priority_queue_array[thrd_priority(target_pcb_ptr)], target_pcb_ptr);
                 spthread_enable_interrupts_self(); 
             }
             return 0;
@@ -849,10 +856,10 @@ int k_kill(pid_t pid, k_signal_t sig) {
                 target_pcb_ptr->status = THRD_ZOMBIE;
                 target_pcb_ptr->term_signal = P_SIGTERM;
                 target_pcb_ptr->exit_code = 1;
-                pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(target_pcb_ptr)], pid);  
+                //pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(target_pcb_ptr)], pid);  
 
-                // update its parent's child pid, and it's child's ppid    
-                //pcb_disconnect_parent_child(target_pcb_ptr);                
+                // update its child's ppid    
+                pcb_disconnect_child(target_pcb_ptr);                
 
                 spthread_enable_interrupts_self(); 
             }
@@ -865,7 +872,10 @@ int k_kill(pid_t pid, k_signal_t sig) {
 void k_printprocess(void) {
     dprintf(STDERR_FILENO, "PID\tPPID\tPRI\tSTAT\tCMD\n");
     for (int i = 0; i < pcb_vec_len(&all_unreaped_pcb_vector); i++) {
-        print_pcb_info_single_line((&all_unreaped_pcb_vector)->pcb_ptr_array[i]);
+        pcb_t* curr_pcb_ptr = (&all_unreaped_pcb_vector)->pcb_ptr_array[i]; 
+        if (thrd_status(curr_pcb_ptr) != THRD_REAPED) {
+            print_pcb_info_single_line(curr_pcb_ptr);    
+        }        
     } 
     k_exit();
 }
@@ -911,11 +921,11 @@ void k_exit(void) {
     self_pcb_ptr->status = THRD_ZOMBIE;
     self_pcb_ptr->term_signal = 0;
     self_pcb_ptr->exit_code = 0;    
-    pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(self_pcb_ptr)], thrd_pid(self_pcb_ptr));
+    //pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(self_pcb_ptr)], thrd_pid(self_pcb_ptr));
     spthread_enable_interrupts_self(); 
 
-    // update its parent's child pid, and it's child's ppid    
-    pcb_disconnect_parent_child(self_pcb_ptr);
+    // update its child's ppid    
+    pcb_disconnect_child(self_pcb_ptr);
 
     extern volatile int cumulative_tick_global;
     klog("[%5d]\tZOMBIE\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(self_pcb_ptr), thrd_priority(self_pcb_ptr));

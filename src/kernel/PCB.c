@@ -58,7 +58,7 @@ int pcb_init_empty(pcb_t** result_pcb, pcb_t* parent_pcb_ptr, int priority_code,
     self_pcb_ptr->term_signal = 0;
     self_pcb_ptr->stop_signal = 0;
     self_pcb_ptr->cont_signal = 0;
-    self_pcb_ptr->errno = 0;
+    self_pcb_ptr->errno = 0;    
 
     // --- others (to be decided) ---
     self_pcb_ptr->fds = NULL;    
@@ -81,15 +81,16 @@ int pcb_init(spthread_t thread, pcb_t** result_pcb, pcb_t* parent_pcb_ptr, int p
     return 0;
 }
 
-void pcb_disconnect_parent_child(pcb_t* self_ptr) {
-    // handle parent (if exists) PCB's child pid info
-    // pcb_t* parent_pcb_ptr = k_get_self_pcb();   // old code
+void pcb_disconnect_parent(pcb_t* self_ptr) {
+    // handle parent (if exists) PCB's child pid info 
     pcb_t* parent_pcb_ptr = pcb_vec_seek_pcb_by_pid(&all_unreaped_pcb_vector, thrd_ppid(self_ptr)); 
 
     if (parent_pcb_ptr != NULL) {
         pcb_remove_child_pid(parent_pcb_ptr, thrd_pid(self_ptr));
     }
+}
 
+void pcb_disconnect_child(pcb_t* self_ptr) {
     // handle child (if exists) PCB's parent pid info
     for (int i = 0; i < thrd_num_child(self_ptr); i++) {
         pcb_t* child_pcb_ptr = pcb_vec_seek_pcb_by_pid(&all_unreaped_pcb_vector, self_ptr->child_pids[i]);
@@ -101,12 +102,14 @@ void pcb_disconnect_parent_child(pcb_t* self_ptr) {
     self_ptr->num_child_pids = 0;
 }
 
+
+
 void pcb_destroy(pcb_t* self_ptr) {
 
-    pcb_disconnect_parent_child(self_ptr);
+    //pcb_disconnect_parent(self_ptr);
+    //pcb_disconnect_child(self_ptr);
 
-    free(self_ptr);
-    self_ptr = NULL;
+    free(self_ptr);    
 }
 
 
@@ -194,6 +197,7 @@ void print_pcb_info_single_line(pcb_t* self_ptr) {
         case THRD_STOPPED: status_str = "S"; break;
         case THRD_BLOCKED: status_str = "B"; break;
         case THRD_ZOMBIE:  status_str = "Z"; break;
+        case THRD_REAPED:  status_str = "T"; break;
     }    
     dprintf(STDERR_FILENO, "%d\t%d\t%d\t%s\t%s\n", thrd_pid(self_ptr), thrd_ppid(self_ptr), thrd_priority(self_ptr), status_str, thrd_CMD(self_ptr));
 }

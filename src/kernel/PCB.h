@@ -22,7 +22,8 @@ typedef enum {
     THRD_RUNNING = 0, // running | ready
     THRD_STOPPED = 1,
     THRD_BLOCKED = 2, // e.g. sleeping | waiting on something    
-    THRD_ZOMBIE = 3    
+    THRD_ZOMBIE = 3,
+    THRD_REAPED = 4    
 } thrd_status_t;
 
 typedef struct pcb_st {
@@ -50,7 +51,7 @@ typedef struct pcb_st {
     k_signal_t term_signal;
     k_signal_t stop_signal;
     k_signal_t cont_signal;
-    int errno;
+    int errno;    
 
     // --- others (to be decided) ---
     int* fds; // array of file descriptors
@@ -94,7 +95,8 @@ int pcb_init_empty(pcb_t** result_pcb, pcb_t* parent_pcb_ptr, int priority_code,
  */
 void pcb_destroy(pcb_t* self_ptr);
 
-void pcb_disconnect_parent_child(pcb_t* self_ptr);
+void pcb_disconnect_parent(pcb_t* self_ptr);
+void pcb_disconnect_child(pcb_t* self_ptr);
 
 /**
  * This function prints the information of a PCB to STDERR.

@@ -27,7 +27,7 @@ typedef enum {
 typedef void (*data_destroy_fn_ptr)(pcb_t*);
 
 typedef struct pcb_queue_st {
-    queue_type_t q_type; // 0 (high) | 1 (mid) | 2 (low) | 3 (blocked) | 4 (zombie)
+    queue_type_t q_type; // 0 (high) | 1 (mid) | 2 (low) | 3 (blocked) | 4 (stopped) | 5 (zombie)
     pcb_t* q_head_ptr;
     pcb_t* q_end_ptr;
     size_t length;

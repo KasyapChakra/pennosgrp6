@@ -36,10 +36,11 @@ volatile k_errno_t k_errno;
 #define SHELL_THREAD_NAME "shell"
 #define INIT_THREAD_NAME "init"
 
-pcb_queue_t priority_queue_array[NUM_PRIORITY_QUEUES]; 
-
+// pcb queues
+pcb_queue_t priority_queue_array[NUM_PRIORITY_QUEUES]; // queue of running/runnable threads
 pcb_queue_t blocked_queue; // queue of blocked/sleeping threads
 pcb_queue_t stopped_queue; // queue of stopped threads
+pcb_queue_t zombie_queue; // queue of zombie threads
 // this vector holds all the PCBs (threads) that have not been reaped
 pcb_vec_t all_unreaped_pcb_vector;
 
@@ -92,9 +93,10 @@ void pennos_kernel(void) {
     for (int i = 0; i < NUM_PRIORITY_QUEUES; i++) {
         priority_queue_array[i] = pcb_queue_init(i); // need to be destroyed later
     }  
-
+    // initialize blocked (waiting/sleeping), stopped, zombie queues
     blocked_queue = pcb_queue_init(QUEUE_BLOCKED);
     stopped_queue = pcb_queue_init(QUEUE_STOPPED);
+    zombie_queue = pcb_queue_init(QUEUE_ZOMBIE);
     // initialize PCB vector to hold all unreaped PCBs
     all_unreaped_pcb_vector = pcb_vec_new(0, pcb_destroy); // need to be destroyed later 
     
@@ -119,15 +121,13 @@ void pennos_kernel(void) {
         .quantum_msec = 100,
     };  
     scheduler_fn(&new_scheduler_para);
-    spthread_continue(thrd_init); // make sure thread init is not suspended
-
     // scheduler running ...
     // ...
     // till shell user exit by ctrl-D    
-
+    spthread_continue(thrd_init); // make sure thread init is not suspended
     spthread_join(thrd_init, NULL); // wait for init thread to join
-
-
+    // block wait to join init thread
+    // ..
     pcb_vec_destroy(&all_unreaped_pcb_vector);
 
     // for debug ///////////////////////
@@ -205,6 +205,9 @@ void* thrd_init_fn([[maybe_unused]] void* arg) {
     pcb_t* self_pcb_ptr = k_get_self_pcb();
     self_pcb_ptr->status = THRD_BLOCKED; // modify self status to BLOCKED as it will block and wait for shell to join
     spthread_join(thrd_shell, NULL); // wait for shell thread to join
+    // init thread block wait to for shell thread to join
+    // ...
+    // till shell user exit by ctrl-D       
     self_pcb_ptr->status = THRD_RUNNING; // modify self status to RUNNING as shell thread has joined
 
 
@@ -212,7 +215,10 @@ void* thrd_init_fn([[maybe_unused]] void* arg) {
     // cancel and join all PCBs in pcb vector
     // starts with i = 2, because init at i = 0 and shell at i = 1
     for (int i = 2; i < pcb_vec_len(&all_unreaped_pcb_vector); i++) {
-        cancel_and_join_pcb((&all_unreaped_pcb_vector)->pcb_ptr_array[i]);
+        pcb_t* curr_pcb_ptr = (&all_unreaped_pcb_vector)->pcb_ptr_array[i];
+        if (thrd_status(curr_pcb_ptr) != THRD_REAPED) {
+            cancel_and_join_pcb((&all_unreaped_pcb_vector)->pcb_ptr_array[i]);    
+        }        
     }
     
     /*

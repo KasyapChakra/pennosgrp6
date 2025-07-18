@@ -82,9 +82,41 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
     setitimer(ITIMER_REAL, &scheduler_itimer, NULL);    
 
     pcb_t* curr_pcb_ptr;
+    pcb_t* curr_run_pcb_ptr;
     while (!pennos_done) {
 
         for (int i = 0; i < arg_ptr->q_pick_pattern_len; i++) {  
+            //////////////////////////////////////////////////////////////////
+            spthread_disable_interrupts_self(); // protection ON       
+            // process pcb vec
+            for (int i = 0; i < pcb_vec_len(&all_unreaped_pcb_vector); i++) {
+                curr_pcb_ptr = (&all_unreaped_pcb_vector)->pcb_ptr_array[i];
+                if ((thrd_status(curr_pcb_ptr) == THRD_RUNNING) && (!pcb_in_prio_queue(curr_pcb_ptr, &priority_queue_array[thrd_priority(curr_pcb_ptr)]))) { 
+                    // found a thread that is ready for run but not in its corresponding priority queue
+                    // ==> push back to priority queue
+                    pcb_queue_push(&priority_queue_array[thrd_priority(curr_pcb_ptr)], curr_pcb_ptr);  
+                    continue;
+                } 
+                /*
+                if ((thrd_status(curr_pcb_ptr) == THRD_BLOCKED) && (sleeping?)) {
+                    // check sleep time
+                    // calculate duration
+                    if (>= limit) {
+                        curr_pcb_ptr->status = THRD_RUNNING;
+                        pcb_queue_push(&priority_queue_array[thrd_priority(curr_pcb_ptr)], curr_pcb_ptr);                          
+                    }
+                    continue;
+                }
+                */
+                if (thrd_status(curr_pcb_ptr) == THRD_REAPED) {
+                    // remove and destroy reaped thread from pcb vec                    
+                    pcb_vec_remove_by_pcb(&all_unreaped_pcb_vector, curr_pcb_ptr);
+                    pcb_destroy(curr_pcb_ptr);  
+                    i--;
+                }
+            }
+            spthread_enable_interrupts_self(); // protection OFF
+            //////////////////////////////////////////////////////////////////
 
             if (pennos_done) {
                 break;
@@ -116,32 +148,41 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
 
             // at least one queue is not empty 
             // ==> keep looping till find the non-empty queue at its "quantum slot"
+
+            ////////////////////////////////////////////////////////////////////
+            // make sure scheduler only continues a runnable thread and meanwhile "refresh" queue
             spthread_disable_interrupts_self(); // protection ON         
             pcb_queue_t* curr_queue_ptr = &arg_ptr->q_array[arg_ptr->q_pick_pattern_array[i]];
-            if (queue_is_empty(curr_queue_ptr)) {
+            curr_pcb_ptr = queue_head(curr_queue_ptr);
+            curr_run_pcb_ptr = NULL;
+
+            while (curr_pcb_ptr != NULL) {
+                if (thrd_status(curr_pcb_ptr) == THRD_RUNNING) {
+                    curr_run_pcb_ptr = curr_pcb_ptr;
+                    curr_pcb_ptr = thrd_next(curr_pcb_ptr);
+                } else {
+                    pcb_t* temp_pcb_ptr = curr_pcb_ptr;
+                    curr_pcb_ptr = thrd_next(curr_pcb_ptr);
+                    pcb_queue_pop_by_pid(curr_queue_ptr, thrd_pid(temp_pcb_ptr));
+                    if (thrd_status(temp_pcb_ptr) == THRD_REAPED) {
+                        pcb_vec_remove_by_pcb(&all_unreaped_pcb_vector, temp_pcb_ptr);
+                        pcb_destroy(temp_pcb_ptr);
+                    }
+                }
+            }
+
+            if (curr_run_pcb_ptr == NULL) {
+                // this queue is "cleaned" and no runnable thread found
                 spthread_enable_interrupts_self(); // protection OFF
                 continue;
-            }
-            curr_pcb_ptr = queue_head(curr_queue_ptr);
-            ////////////////////////////////////////////////////////////////////
-            // make sure scheduler only continues a runnable thread
-            while ((curr_pcb_ptr != NULL) && (thrd_status(curr_pcb_ptr) != THRD_RUNNING)) {
-                // not a runnable thread ==> pop it out of the queue and move to the new head of the same queue
-                pcb_queue_pop(curr_queue_ptr);
-                curr_pcb_ptr = queue_head(curr_queue_ptr);
-            }
-            if (curr_pcb_ptr == NULL) {
-                // now the queue is empty
-                spthread_enable_interrupts_self(); // protection OFF
-                continue;                
-            }
+            }     
             ////////////////////////////////////////////////////////////////////
             // now we have a runnable thread from this queue
-            spthread_continue(thrd_handle(curr_pcb_ptr));
+            spthread_continue(thrd_handle(curr_run_pcb_ptr));
             spthread_enable_interrupts_self(); // protection OFF
 
 
-            klog("[%5d]\tSCHEDULE\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(curr_pcb_ptr), queue_type(curr_queue_ptr));
+            klog("[%5d]\tSCHEDULE\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(curr_run_pcb_ptr), queue_type(curr_queue_ptr));
             
             ///////////////////////// for DEBUG /////////////////////////
             // spthread_disable_interrupts_self();
@@ -153,17 +194,26 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
             sigsuspend(&sig_set_ex_sigalrm);    
 
             spthread_disable_interrupts_self(); // protection ON  
-            curr_pcb_ptr = pcb_queue_pop(curr_queue_ptr);            
-            if (thrd_status(curr_pcb_ptr) == THRD_RUNNING) {
+            if (pcb_queue_pop(curr_queue_ptr) == NULL) {
+                continue;
+            }
+
+            if (thrd_status(curr_run_pcb_ptr) == THRD_RUNNING) {
                 // only suspend and push back to priority queue if the thread status is still RUNNING
-                spthread_suspend(thrd_handle(curr_pcb_ptr));                
-                pcb_queue_push(curr_queue_ptr, curr_pcb_ptr);    
-            }            
+                spthread_suspend(thrd_handle(curr_run_pcb_ptr));                
+                pcb_queue_push(curr_queue_ptr, curr_run_pcb_ptr);    
+            } else if (thrd_status(curr_run_pcb_ptr) == THRD_REAPED) {
+                pcb_vec_remove_by_pcb(&all_unreaped_pcb_vector, curr_run_pcb_ptr);
+                pcb_destroy(curr_run_pcb_ptr);
+            }
             spthread_enable_interrupts_self(); // protection OFF
 
-        }
 
-    }    
+
+
+        } // end of for loop
+
+    }   // end of while loop 
 
     dprintf(STDERR_FILENO, "~~~~~~~~~~ Scheduler function exit ~~~~~~~~~~\n");
 

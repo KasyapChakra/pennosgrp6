@@ -28,9 +28,11 @@ extern volatile k_errno_t k_errno;
 // set queues as global variable so that scheduler thread and other threads can access the queues
 extern pcb_queue_t priority_queue_array[NUM_PRIORITY_QUEUES]; 
 
-// global queue holding all PCBs currently blocked (e.g. sleeping)
+// global queue holding all PCBs currently blocked (waiting/sleeping)
 extern pcb_queue_t blocked_queue;
 // queue holding threads that are STOPPED via P_SIGSTOP
+extern pcb_queue_t stopped_queue;
+// queue holding zombie threads to be reaped
 extern pcb_queue_t stopped_queue;
 
 // this vector holds all the PCBs (threads) that have not been reaped
