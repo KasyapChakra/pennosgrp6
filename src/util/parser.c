@@ -30,19 +30,31 @@ int parse_command(const char *const cmd_line, struct parsed_command **const resu
             break;
         }
 
-    // trimming leading and trailing whitespaces
+    /* Trim leading / trailing whitespace */
     while (start < end && isspace(*start)) ++start;
     while (start < end && isspace(end[-1])) --end;
 
-    struct parsed_command *pcmd = calloc(1, sizeof(struct parsed_command));
+    struct parsed_command* pcmd = calloc(1, sizeof(struct parsed_command));
     if (pcmd == NULL) return -1;
-    if (start == end) goto PROCESS_SUCCESS; // empty line, fast pass
+    if (start == end) goto PROCESS_SUCCESS; /* empty line */
 
-    // If a command is terminated by the control operator ampersand ( '&' ),
-    // the shell shall execute the command in background.
-    if (end[-1] == '&') {
-        pcmd->is_background = true;
-        --end;
+    /* Handle optional background '&' possibly preceded by spaces */
+    {
+        const char* scan = end;
+        /* walk backwards over whitespace */
+        while (scan > start && isspace(scan[-1])) --scan;
+        if (scan > start && scan[-1] == '&') {
+            pcmd->is_background = true;
+            /* log. end points *after* last real char; we want to exclude & */
+            end = scan - 1;            /* logical end (char before &)        */
+
+            /* overwrite the '&' so later first-pass scan doesn’t see it */
+            char* mutable_str = (char*)cmd_line; /* safe: we own copy later */
+            mutable_str[scan - cmd_line - 1] = ' ';
+
+            /* further trim whitespace that may precede the ampersand */
+            while (start < end && isspace(end[-1])) --end;
+        }
     }
 
     // first pass, check token

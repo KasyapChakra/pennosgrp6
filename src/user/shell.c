@@ -6,6 +6,9 @@
 #include "../util/parser.h"
 #include "../util/utils.h"
 #include "jobs.h"
+#include "../shell/shell.h"  // Include to access current_fg_pid
+#include "syscall_kernel.h"  // Include to access s_sleep and other syscalls
+#include "../kernel/spthread.h"  // Include for spthread interrupt control
 
 #include "../common/pennfat_definitions.h"
 #include "../internal/pennfat_kernel.h"
@@ -396,6 +399,7 @@ int shell_main(struct parsed_command* cmd) {
     *           prompt – no pipes, no redirections, no child proc.     *
     * ────────────────────────────────────────────────────────────*/
   char** argv0 = cmd->commands[0]; /* words of 1st stage */
+  
   thd_func_t inl = get_func_from_cmd(argv0[0], inline_funcs);
   if (inl) {    /* found a shell-local built-in */
     inl(argv0); /* run it right here            */
@@ -449,13 +453,26 @@ int shell_main(struct parsed_command* cmd) {
     return -1;
 
   if (!cmd->is_background) { /* foreground job           */
-    dprintf(STDERR_FILENO, "shell_main: TODO: Should be waiting\n");
+    // Wait for foreground process to complete
+    current_fg_pid = child_pid; // Track foreground process for Ctrl+C
     // s_tcsetpid(child_pid);  
-    // s_waitpid(child_pid, NULL, false); //TODO: Wait_pid not working
-    // waits infinitely, even when the child should have exited
+    int status;
+    pid_t wait_result = s_waitpid(child_pid, &status, false); // Enable waitpid for foreground processes
+    current_fg_pid = -1; // Reset after process completes
+    
+    // Check if the process was terminated by signal
+    if (wait_result > 0) {
+      // Process was successfully reaped
+      // No additional handling needed for normal termination or signal termination
+    } else {
+      // waitpid failed - this shouldn't normally happen for valid child processes
+      dprintf(STDERR_FILENO, "shell: waitpid failed for PID %d\n", child_pid);
+    }
     // s_tcsetpid(shell_pgid);
   } else {
-    /* TODO: store background job info */
+    /* Background job - add to jobs table and don't wait */
+    // TODO: Add to jobs table when jobs system is fully implemented
+    // For now, just let it run in background without waiting
   }
 
   if (close_in)
@@ -483,9 +500,63 @@ void* ps(void* arg) {
 }
 
 void* busy(void* arg) {
+  // Pure computational busy loop - no system calls, no sleeps
+  // This should be CPU intensive but allow PennOS scheduler to preempt normally
+  volatile unsigned long long counter = 0;
+  volatile unsigned long long work_result = 0;
+  
   while (true) {
-    // intentionally spinning
+    // Phase 1: Pure mathematical computation
+    for (int i = 0; i < 10000; i++) {
+      counter++;
+      work_result += counter * counter;
+      work_result ^= counter;
+      work_result = (work_result << 1) ^ (work_result >> 31);
+    }
+    
+    // Phase 2: Memory access patterns
+    volatile int temp_array[100];
+    for (int j = 0; j < 100; j++) {
+      temp_array[j] = (int)(counter + j);
+      work_result += temp_array[j];
+    }
+    
+    // Phase 3: More computation with branching
+    for (int k = 0; k < 1000; k++) {
+      if (counter % 2 == 0) {
+        work_result += k * 3;
+      } else {
+        work_result -= k * 2;
+      }
+      
+      // Simulate some complex calculation
+      volatile int temp = k;
+      temp = temp * temp + k;
+      temp = temp % 997; // Some prime number operations
+      work_result ^= temp;
+    }
+    
+    // Phase 4: String/character operations
+    volatile char str_buffer[256];
+    for (int m = 0; m < 256; m++) {
+      str_buffer[m] = (char)((counter + m) % 256);
+      work_result += str_buffer[m];
+    }
+    
+    // Phase 5: Floating point operations (if available)
+    volatile double float_result = 1.0;
+    for (int n = 0; n < 100; n++) {
+      float_result *= 1.1;
+      float_result /= 1.05;
+      work_result += (unsigned long long)float_result;
+    }
+    
+    // Prevent compiler optimization
+    if (work_result == 0x123456789ABCDEF0ULL) {
+      break; // This will never happen, but prevents optimization
+    }
   }
+  
   return NULL;
 }
 

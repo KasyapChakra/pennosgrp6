@@ -146,13 +146,12 @@ void pennos_kernel(void) {
 
 void* thrd_init_fn([[maybe_unused]] void* arg) {
 
-    // block SIGALRM | SIGINT | SIGTSTP (the mask is inherited by all child threads)
+    // block SIGALRM for all threads (but not SIGINT/SIGTSTP - shell needs these)
     sigset_t sig_set_init;
     sigemptyset(&sig_set_init);
     sigaddset(&sig_set_init, SIGALRM);
-    sigaddset(&sig_set_init, SIGINT);
-    sigaddset(&sig_set_init, SIGTSTP);
-    pthread_sigmask(SIG_BLOCK, &sig_set_init, NULL);   
+    // Don't block SIGINT and SIGTSTP here - let shell handle them
+    pthread_sigmask(SIG_BLOCK, &sig_set_init, NULL);
 
     pcb_t* temp_pcb_ptr;
     

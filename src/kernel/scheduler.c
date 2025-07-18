@@ -60,7 +60,7 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
     };      
     sigaction(SIGALRM, &sigaction_st_sigalrm, NULL);
 
-    // block SIGINT and SIGTSTP for scheduler thread
+    // block SIGINT and SIGTSTP for scheduler thread - only shell should handle these
     sigset_t sig_set_scheduler;
     sigemptyset(&sig_set_scheduler);
     sigaddset(&sig_set_scheduler, SIGINT);
