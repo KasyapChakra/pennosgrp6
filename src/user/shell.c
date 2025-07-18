@@ -64,7 +64,7 @@ int s_kill(pid_t pid, int signal);
 void s_exit(void);
 int s_nice(pid_t pid, int priority);
 void s_sleep(unsigned int ticks);
-int s_printprocess(void);
+void s_printprocess(void);
 #endif
 
 // Error handling function
