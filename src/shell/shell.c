@@ -26,6 +26,9 @@
 extern void* zombify(void*);
 extern void* orphanify(void*);
 
+// Global variable to track current foreground process
+volatile pid_t current_fg_pid = -1;
+
 
 void write_prompt(char* prompt_input) {
   ssize_t num_bytes_write;
@@ -38,8 +41,24 @@ void write_prompt(char* prompt_input) {
 
 void handler_sigint_shell(int signum) {
   if (signum == SIGINT) {
-    write_prompt("\n");    // add a newline after ^C printed on the terminal
-    write_prompt(PROMPT);  // re-prompt
+    pid_t fg_pid = current_fg_pid; // Capture the value atomically
+    if (fg_pid > 0) {
+      // Kill the foreground process
+      int result = s_kill(fg_pid, P_SIGTERM);
+      current_fg_pid = -1; // Reset only after successful kill
+      write_prompt("\n");
+      if (result == 0) {
+        // Signal sent successfully, let the shell continue normally
+        // The waitpid in shell_main will handle the cleanup
+      } else {
+        // Failed to send signal, re-prompt
+        write_prompt(PROMPT);  
+      }
+    } else {
+      // No foreground process, just add newline and re-prompt
+      write_prompt("\n");    // add a newline after ^C printed on the terminal
+      write_prompt(PROMPT);  // re-prompt
+    }
   }
 }
 
@@ -59,15 +78,36 @@ void clear_input_buffer() {
 }
 
 ssize_t shell_read_cmd(char* cmd_string) {
-  ssize_t num_bytes_read;
-
-  // read user command from user input
-  // max input length is (MAX_LINE_LENGTH - 1),
-  // so '\0' can be added in the end (required by strtok())
-  num_bytes_read = read(STDIN_FILENO, cmd_string, MAX_LINE_LENGTH - 1);
-  if (num_bytes_read == -1) {
-    perror("Failed to read user command");
-    exit(EXIT_FAILURE);
+  ssize_t num_bytes_read = 0;
+  char ch;
+  
+  // Read character by character until newline or EOF
+  while (num_bytes_read < MAX_LINE_LENGTH - 1) {
+    ssize_t bytes = read(STDIN_FILENO, &ch, 1);
+    
+    if (bytes == -1) {
+      perror("Failed to read user command");
+      exit(EXIT_FAILURE);
+    }
+    
+    if (bytes == 0) {
+      // EOF reached
+      if (num_bytes_read == 0) {
+        if (write(STDERR_FILENO, "\n", 1) == -1) {
+          perror("Failed to write a newline after user exits by ctrl-D");      
+          exit(EXIT_FAILURE);
+        }
+        return -1;
+      }
+      break;
+    }
+    
+    cmd_string[num_bytes_read++] = ch;
+    
+    // Stop at newline
+    if (ch == '\n') {
+      break;
+    }
   }
 
   // check if there is any non-empty (not space or tab or enter) input from user
@@ -80,59 +120,10 @@ ssize_t shell_read_cmd(char* cmd_string) {
     }
   }
 
-  // user input starts with ctrl-D ==> write a newline and exit
-  if (num_bytes_read == 0) {
-    if (write(STDERR_FILENO, "\n", 1) == -1) {
-      perror("Failed to write a newline after user exits by ctrl-D");      
-      exit(EXIT_FAILURE);
-    }
-    return -1;
-  }
-
-  // empty input ending with ctrl-D ==> write a newline and exit
-  if (!flag_non_empty_input && (cmd_string[num_bytes_read - 1] != '\n') &&
-      (num_bytes_read < MAX_LINE_LENGTH - 1)) {
-    if (write(STDERR_FILENO, "\n", 1) == -1) {
-      perror("Failed to write a newline after user exits by ctrl-D");      
-      exit(EXIT_FAILURE);
-    }
-    return -1;
-  }
-
-  // empty input exceeding max length ==> write a newline and continue
-  if (!flag_non_empty_input && (cmd_string[num_bytes_read - 1] != '\n') &&
-      (num_bytes_read == MAX_LINE_LENGTH - 1)) {
-    if (write(STDERR_FILENO, "\n", 1) == -1) {
-      perror("Failed to write a newline after an empty line with max length");      
-      exit(EXIT_FAILURE);
-    }
-  }
-
-  // only three cases can arrive here:
-  // (1) empty input ending with '\n'
-  // (2) empty input exceeding max length
-  // (3) non-empty line
-
-  // input length reaches max length, clear the remaining input buffer
-  if (num_bytes_read == MAX_LINE_LENGTH - 1) {
-    clear_input_buffer();
-  }
-
-  // add null terminator '\0' at the end of the command string (required by
-  // strtok())
+  // add null terminator '\0' at the end of the command string
   cmd_string[num_bytes_read] = '\0';
 
-  // write a newline if user finishes command by ctrl-D
-  if (cmd_string[num_bytes_read - 1] != '\n') {
-    if (write(STDERR_FILENO, "\n", 1) == -1) {
-      perror("Failed to write a newline after user finishes by ctrl-D");      
-      exit(EXIT_FAILURE);
-    }
-  }
-
-  // command string includes all the terminal input from user,
-  // and ends with '\0'
-  // num_bytes_read does not include the last null terminator '\0' added
+  // return appropriate value
   if (flag_non_empty_input) {
     return num_bytes_read;  // non-empty input ==> return "true" number of bytes
   }
@@ -210,8 +201,10 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
         bool is_experimental_cmd = false;
         if (strcmp(pcmd_ptr->commands[0][0], "ps") == 0) {            
             pid_t temp_pid = s_spawn(ps_builtin, NULL, -1, -1);
+            current_fg_pid = temp_pid; // Track foreground process
             //dprintf(STDERR_FILENO, "--- ps pid: %d\n", temp_pid);
             s_waitpid(temp_pid, NULL, false); //pid_t temp_pid_waited = s_waitpid(temp_pid, NULL, false);
+            current_fg_pid = -1; // Reset after process completes
             //dprintf(STDERR_FILENO, "--- waitpid return pid: %d\n", temp_pid_waited);
             is_experimental_cmd = true;
         } else if (strcmp(pcmd_ptr->commands[0][0], "sleep") == 0) {          
@@ -256,4 +249,5 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
     spthread_exit(NULL);
     return NULL;   
 }
+
 

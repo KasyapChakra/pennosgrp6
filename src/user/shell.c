@@ -6,6 +6,8 @@
 #include "../util/parser.h"
 #include "../util/utils.h"
 #include "jobs.h"
+#include "../shell/shell.h"  // Include to access current_fg_pid
+#include "syscall_kernel.h"  // Include to access s_sleep and other syscalls
 
 #include "../common/pennfat_definitions.h"
 #include "../internal/pennfat_kernel.h"
@@ -15,6 +17,60 @@
 #include <stdlib.h>  // NULL, atoi
 #include <string.h>
 #include <unistd.h>  // STDIN_FILENO / read
+
+// Process status macros
+#ifndef P_WIFEXITED
+#define P_WIFEXITED(status) (((status) & 0x7f) == 0)
+#endif
+#ifndef P_WIFSTOPPED
+#define P_WIFSTOPPED(status) (((status) & 0xff) == 0x7f)
+#endif
+#ifndef P_WIFSIGNALED
+#define P_WIFSIGNALED(status) (((status) & 0x7f) != 0 && ((status) & 0x7f) != 0x7f)
+#endif
+
+// File system constants
+#ifndef F_SEEK_SET
+#define F_SEEK_SET 0
+#endif
+#ifndef F_SEEK_CUR
+#define F_SEEK_CUR 1
+#endif
+#ifndef F_SEEK_END
+#define F_SEEK_END 2
+#endif
+
+// Error handling
+#ifndef P_ERRNO
+extern int P_ERRNO;
+#endif
+
+// File system system calls
+#ifndef s_open
+int s_open(const char *fname, int mode);
+int s_read(int fd, int n, char *buf);
+int s_write(int fd, const char *str, int n);
+int s_close(int fd);
+int s_unlink(const char *fname);
+int s_lseek(int fd, int offset, int whence);
+int s_ls(const char *filename);
+#endif
+
+// Process system calls
+#ifndef s_spawn
+pid_t s_spawn(void* (*func)(void*), char *argv[], int fd0, int fd1);
+pid_t s_waitpid(pid_t pid, int* wstatus, bool nohang);
+int s_kill(pid_t pid, int signal);
+void s_exit(void);
+int s_nice(pid_t pid, int priority);
+void s_sleep(unsigned int ticks);
+void s_printprocess(void);
+#endif
+
+// Error handling function
+#ifndef u_perror
+void u_perror(const char *s);
+#endif
 
 /* ---------- forward-declarations for built-ins used below ---------- */
 void* jobs_builtin(void*);
@@ -396,6 +452,7 @@ int shell_main(struct parsed_command* cmd) {
     *           prompt – no pipes, no redirections, no child proc.     *
     * ────────────────────────────────────────────────────────────*/
   char** argv0 = cmd->commands[0]; /* words of 1st stage */
+  
   thd_func_t inl = get_func_from_cmd(argv0[0], inline_funcs);
   if (inl) {    /* found a shell-local built-in */
     inl(argv0); /* run it right here            */
@@ -449,13 +506,26 @@ int shell_main(struct parsed_command* cmd) {
     return -1;
 
   if (!cmd->is_background) { /* foreground job           */
-    dprintf(STDERR_FILENO, "shell_main: TODO: Should be waiting\n");
+    // Wait for foreground process to complete
+    current_fg_pid = child_pid; // Track foreground process for Ctrl+C
     // s_tcsetpid(child_pid);  
-    // s_waitpid(child_pid, NULL, false); //TODO: Wait_pid not working
-    // waits infinitely, even when the child should have exited
+    int status;
+    pid_t wait_result = s_waitpid(child_pid, &status, false); // Enable waitpid for foreground processes
+    current_fg_pid = -1; // Reset after process completes
+    
+    // Check if the process was terminated by signal
+    if (wait_result > 0) {
+      // Process was successfully reaped
+      // No additional handling needed for normal termination or signal termination
+    } else {
+      // waitpid failed - this shouldn't normally happen for valid child processes
+      dprintf(STDERR_FILENO, "shell: waitpid failed for PID %d\n", child_pid);
+    }
     // s_tcsetpid(shell_pgid);
   } else {
-    /* TODO: store background job info */
+    /* Background job - add to jobs table and don't wait */
+    // TODO: Add to jobs table when jobs system is fully implemented
+    // For now, just let it run in background without waiting
   }
 
   if (close_in)
@@ -483,9 +553,35 @@ void* ps(void* arg) {
 }
 
 void* busy(void* arg) {
+  // Simple but CPU-intensive loop that allows scheduler preemption
+  volatile unsigned long counter = 0;
+  volatile unsigned long result = 1;
+  
   while (true) {
-    // intentionally spinning
+    // Do CPU-intensive mathematical operations
+    for (int i = 0; i < 50000; i++) {
+      counter++;
+      result *= counter;
+      result ^= counter;
+      result += counter * counter;
+      
+      // Add some memory operations
+      if (counter % 1000 == 0) {
+        volatile int temp_data[50];
+        for (int j = 0; j < 50; j++) {
+          temp_data[j] = counter + j;
+          result += temp_data[j];
+        }
+      }
+    }
+    
+    // Reset to prevent overflow and keep working
+    if (counter > 1000000) {
+      counter = 0;
+      result = 1;
+    }
   }
+  
   return NULL;
 }
 

@@ -29,8 +29,8 @@ void clear_input_buffer();
 ssize_t shell_read_cmd(char* cmd_string);
 void* thrd_shell_fn([[maybe_unused]] void* arg);
 
-
-
+// Global variable for tracking foreground process
+extern volatile pid_t current_fg_pid;
 
 
 #endif  // SHELL_H_

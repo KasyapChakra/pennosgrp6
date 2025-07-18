@@ -877,7 +877,10 @@ void k_printprocess(void) {
             print_pcb_info_single_line(curr_pcb_ptr);    
         }        
     } 
-    //k_exit();
+
+    //k_exit(); // ps should return normally, not exit the process
+    
+
 }
  
  /*
