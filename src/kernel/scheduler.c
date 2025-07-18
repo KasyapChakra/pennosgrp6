@@ -175,11 +175,9 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
             }     
             ////////////////////////////////////////////////////////////////////
             // now we have a runnable thread from this queue
+            klog("[%5d]\tSCHEDULE\t%d\t%d\t%s", global_clock, thrd_pid(curr_run_pcb_ptr), thrd_priority(curr_run_pcb_ptr), thrd_CMD(curr_run_pcb_ptr));
             spthread_continue(thrd_handle(curr_run_pcb_ptr));
             spthread_enable_interrupts_self(); // protection OFF
-
-
-            klog("[%5d]\tSCHEDULE\t%d\t%d\tprocess", global_clock, thrd_pid(curr_run_pcb_ptr), queue_type(curr_queue_ptr));
             
             ///////////// update global clock before sigsuspend /////////
             spthread_disable_interrupts_self();

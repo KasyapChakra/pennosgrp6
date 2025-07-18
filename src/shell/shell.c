@@ -208,7 +208,8 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
             //dprintf(STDERR_FILENO, "--- waitpid return pid: %d\n", temp_pid_waited);
             is_experimental_cmd = true;
         } else if (strcmp(pcmd_ptr->commands[0][0], "sleep") == 0) {          
-            pid_t temp_pid = s_spawn(sleep_builtin, pcmd_ptr->commands[0], -1, -1);
+            //pid_t temp_pid = s_spawn(sleep_builtin, pcmd_ptr->commands[0], -1, -1);
+            pid_t temp_pid = s_spawn(sleep_builtin, NULL, -1, -1);
             s_waitpid(temp_pid, NULL, false);
             is_experimental_cmd = true;
         } else if (strcmp(pcmd_ptr->commands[0][0], "pcbvec") == 0) {

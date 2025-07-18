@@ -10,7 +10,8 @@ void* ps_builtin([[maybe_unused]] void* arg) {
 }
 
 void* sleep_builtin([[maybe_unused]] void* arg) {
-    s_sleep(*(clock_tick_t*)arg);
+    //s_sleep(*(clock_tick_t*)arg);
+    s_sleep(3);
     return NULL;
 }
 
