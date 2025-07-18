@@ -44,6 +44,8 @@ pcb_queue_t zombie_queue; // queue of zombie threads
 // this vector holds all the PCBs (threads) that have not been reaped
 pcb_vec_t all_unreaped_pcb_vector;
 
+volatile clock_tick_t global_clock = 0;
+
 
 volatile int count_p0 = 0; // debug //////////
 volatile int count_p1 = 0; // debug //////////
@@ -131,7 +133,7 @@ void pennos_kernel(void) {
     pcb_vec_destroy(&all_unreaped_pcb_vector);
 
     // for debug ///////////////////////
-    dprintf(STDERR_FILENO, "Final total tick: # %d\n", cumulative_tick_global);  
+    dprintf(STDERR_FILENO, "Final total tick: # %u\n", global_clock);  
     dprintf(STDERR_FILENO, "\tFinal count for queue 0: # %d\n", count_p0);  
     dprintf(STDERR_FILENO, "\tFinal count for queue 1: # %d\n", count_p1);  
     dprintf(STDERR_FILENO, "\tFinal count for queue 2: # %d\n", count_p2);  
@@ -348,8 +350,8 @@ void set_process_name(pcb_t* proc, const char* name) {
  * e.g. "[  123]    CREATED    42    1    process"
  */
 void lifecycle_event_log(pcb_t* proc, const char* event, void* info) {
-  extern volatile int cumulative_tick_global;
-  klog("[%5d]\t%s\t%d\t%d\tprocess", cumulative_tick_global, event,
+  extern volatile clock_tick_t global_clock;
+  klog("[%5d]\t%s\t%d\t%d\tprocess", global_clock, event,
        thrd_pid(proc), thrd_priority(proc));
 }
 

@@ -214,6 +214,10 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
             s_waitpid(temp_pid, NULL, false); //pid_t temp_pid_waited = s_waitpid(temp_pid, NULL, false);
             //dprintf(STDERR_FILENO, "--- waitpid return pid: %d\n", temp_pid_waited);
             is_experimental_cmd = true;
+        } else if (strcmp(pcmd_ptr->commands[0][0], "sleep") == 0) {          
+            pid_t temp_pid = s_spawn(sleep_builtin, pcmd_ptr->commands[0], -1, -1);
+            s_waitpid(temp_pid, NULL, false);
+            is_experimental_cmd = true;
         } else if (strcmp(pcmd_ptr->commands[0][0], "pcbvec") == 0) {
             print_pcb_vec_info(&all_unreaped_pcb_vector);
             is_experimental_cmd = true;

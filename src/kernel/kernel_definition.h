@@ -12,6 +12,8 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+typedef unsigned int clock_tick_t;
+
 typedef enum {
     P_SIGSTOP = 1,
     P_SIGCONT = 2, 

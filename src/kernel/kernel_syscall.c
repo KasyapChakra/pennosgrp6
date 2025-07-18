@@ -141,8 +141,8 @@ pcb_t* k_proc_create(pcb_t* parent_pcb_ptr, int priority_code) {
     // thread will be assigned later by k_set_routine_and_run    
     pcb_vec_push_back(&all_unreaped_pcb_vector, pcb_ptr);
     // log create
-    extern volatile int cumulative_tick_global;
-    klog("[%5d]\tCREATE\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(pcb_ptr), thrd_priority(pcb_ptr));
+    extern volatile clock_tick_t global_clock;
+    klog("[%5d]\tCREATE\t%d\t%d\tprocess", global_clock, thrd_pid(pcb_ptr), thrd_priority(pcb_ptr));
     return pcb_ptr;
 }
 
@@ -877,7 +877,7 @@ void k_printprocess(void) {
             print_pcb_info_single_line(curr_pcb_ptr);    
         }        
     } 
-    k_exit();
+    //k_exit();
 }
  
  /*
@@ -927,16 +927,25 @@ void k_exit(void) {
     // update its child's ppid    
     pcb_disconnect_child(self_pcb_ptr);
 
-    extern volatile int cumulative_tick_global;
-    klog("[%5d]\tZOMBIE\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(self_pcb_ptr), thrd_priority(self_pcb_ptr));
+    extern volatile clock_tick_t global_clock;
+    klog("[%5d]\tZOMBIE\t%d\t%d\tprocess", global_clock, thrd_pid(self_pcb_ptr), thrd_priority(self_pcb_ptr));
     spthread_exit(NULL);
     return;
 }
 
 
-void k_sleep([[maybe_unused]] clock_tick_t ticks) {
+void k_sleep([[maybe_unused]] clock_tick_t length_in_second) {
+    spthread_disable_interrupts_self();
+    pcb_t* self_pcb_ptr = k_get_self_pcb();
+    self_pcb_ptr->sleep_stamp = global_clock;
+    self_pcb_ptr->sleep_length = length_in_second * 10;
+    self_pcb_ptr->status = THRD_BLOCKED;
+    spthread_enable_interrupts_self(); 
+    spthread_suspend_self();
     
-    (void)ticks;
+    self_pcb_ptr->sleep_stamp = 0;
+    self_pcb_ptr->sleep_length = 0;  
+    //k_exit();
 }
 
 
@@ -973,8 +982,8 @@ int k_nice(pid_t pid, int priority) {
 
     int old = pcb_ptr->priority_level;
     pcb_ptr->priority_level = priority;
-    extern volatile int cumulative_tick_global;
-    klog("[%5d]\tNICE\t%d\t%d\t%d\tprocess", cumulative_tick_global, pcb_ptr->pid, old, priority);
+    extern volatile clock_tick_t global_clock;
+    klog("[%5d]\tNICE\t%d\t%d\t%d\tprocess", global_clock, pcb_ptr->pid, old, priority);
 
     spthread_disable_interrupts_self();
     pcb_queue_push(&priority_queue_array[priority], pcb_ptr);

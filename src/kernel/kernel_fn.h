@@ -20,10 +20,20 @@
 
 #define NUM_PRIORITY_QUEUES 3
 
+
+
+
 // ============================ Global Variables ============================ // 
 extern volatile pid_t pid_count;
 extern volatile bool pennos_done;
 extern volatile k_errno_t k_errno;
+
+/* total number of clock ticks (each tick = quantum length, default 100 ms) since PennOS boot */
+extern volatile clock_tick_t global_clock; // unit: 100 ms
+
+/* temporary alias until we migrate all call-sites */
+//extern volatile sig_atomic_t cumulative_tick_global; // for DEBUG, can be deleted later ////////////////
+
 
 // set queues as global variable so that scheduler thread and other threads can access the queues
 extern pcb_queue_t priority_queue_array[NUM_PRIORITY_QUEUES]; 
@@ -92,14 +102,14 @@ bool pcb_in_prio_queue(pcb_t* self_ptr, pcb_queue_t* queue_ptr);
 // NOTE: these are early stubs – implementations live in kernel_syscall.c
 // they will be fleshed out incrementally. all comments are kept lowercase per user request.
 
-typedef unsigned int clock_tick_t;
+
 
 // wait / signal / scheduling helpers (stub for now)
 pid_t   k_waitpid(pid_t pid, int* wstatus, bool nohang);
 int     k_kill(pid_t pid, k_signal_t sig);
 int     k_tcsetpid(pid_t pid);
 int     k_nice(pid_t pid, int priority);
-void    k_sleep(clock_tick_t ticks);
+void    k_sleep(clock_tick_t length_in_second);
 int     k_pipe(int fds[2]);
 
 // misc introspection / exit

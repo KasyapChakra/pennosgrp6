@@ -16,6 +16,7 @@
 #include "./kernel_definition.h"
 
 
+
 #define NUM_CHILDREN_MAX 128
 
 typedef enum {
@@ -52,6 +53,8 @@ typedef struct pcb_st {
     k_signal_t stop_signal;
     k_signal_t cont_signal;
     int errno;    
+    clock_tick_t sleep_stamp;
+    clock_tick_t sleep_length; // unit: 100 ms
 
     // --- others (to be decided) ---
     int* fds; // array of file descriptors
@@ -72,6 +75,8 @@ typedef struct pcb_st {
 #define thrd_status(pcb_ptr) ((pcb_ptr)->status)
 #define thrd_pre_status(pcb_ptr) ((pcb_ptr)->pre_status)
 #define thrd_errno(pcb_ptr) ((pcb_ptr)->errno)
+#define thrd_sleepstamp(pcb_ptr) ((pcb_ptr)->sleep_stamp)
+#define thrd_sleeplength(pcb_ptr) ((pcb_ptr)->sleep_length) 
 
 
 // ============================ Functions ============================ //

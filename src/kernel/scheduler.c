@@ -27,7 +27,7 @@
 
 const int queue_pick_pattern[QUEUE_PICK_PATTERN_LENGTH] = {0, 1, 0, 2, 1, 0, 1, 0, 2, 0, 1, 0, 2, 0, 1, 0, 1, 0, 2};
 
-volatile int cumulative_tick_global = 0; // for DEBUG, can be deleted later ////////////////
+
 
 
 void handler_sigalrm_scheduler(int signum) {
@@ -97,17 +97,15 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
                     pcb_queue_push(&priority_queue_array[thrd_priority(curr_pcb_ptr)], curr_pcb_ptr);  
                     continue;
                 } 
-                /*
-                if ((thrd_status(curr_pcb_ptr) == THRD_BLOCKED) && (sleeping?)) {
-                    // check sleep time
-                    // calculate duration
-                    if (>= limit) {
+                
+                if ((thrd_status(curr_pcb_ptr) == THRD_BLOCKED) && thrd_sleepstamp(curr_pcb_ptr) != 0) {                                        
+                    if (global_clock - thrd_sleepstamp(curr_pcb_ptr) >= thrd_sleeplength(curr_pcb_ptr)) {
                         curr_pcb_ptr->status = THRD_RUNNING;
                         pcb_queue_push(&priority_queue_array[thrd_priority(curr_pcb_ptr)], curr_pcb_ptr);                          
                     }
                     continue;
                 }
-                */
+                
                 if (thrd_status(curr_pcb_ptr) == THRD_REAPED) {
                     // remove and destroy reaped thread from pcb vec                    
                     pcb_vec_remove_by_pcb(&all_unreaped_pcb_vector, curr_pcb_ptr);
@@ -135,13 +133,12 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
             // if all queues are empty ==> sigsuspend for a quantum            
             if (all_queues_empty) {
 
-                ///////////////////////// for DEBUG /////////////////////////
+                ///////////// update global clock before sigsuspend /////////
                 spthread_disable_interrupts_self();
-                cumulative_tick_global = (cumulative_tick_global + 1) % 10000;
-                dprintf(STDERR_FILENO, "Scheduler tick on empty queues: # %d\n", cumulative_tick_global);        
+                global_clock++;
+                //dprintf(STDERR_FILENO, "Scheduler tick on empty queues: # %u\n", global_clock);        
                 spthread_enable_interrupts_self();
                 /////////////////////////////////////////////////////////////        
-
                 sigsuspend(&sig_set_ex_sigalrm);    
                 continue;                         
             }
@@ -182,15 +179,14 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
             spthread_enable_interrupts_self(); // protection OFF
 
 
-            klog("[%5d]\tSCHEDULE\t%d\t%d\tprocess", cumulative_tick_global, thrd_pid(curr_run_pcb_ptr), queue_type(curr_queue_ptr));
+            klog("[%5d]\tSCHEDULE\t%d\t%d\tprocess", global_clock, thrd_pid(curr_run_pcb_ptr), queue_type(curr_queue_ptr));
             
-            ///////////////////////// for DEBUG /////////////////////////
-            // spthread_disable_interrupts_self();
-            // cumulative_tick_global = (cumulative_tick_global + 1) % 10000;
-            // dprintf(STDERR_FILENO, "Scheduler tick: # %d\n", cumulative_tick_global);        
-            // spthread_enable_interrupts_self();
+            ///////////// update global clock before sigsuspend /////////
+            spthread_disable_interrupts_self();
+            global_clock++;
+            //dprintf(STDERR_FILENO, "Scheduler tick: # %u\n", global_clock);        
+            spthread_enable_interrupts_self();
             /////////////////////////////////////////////////////////////     
-
             sigsuspend(&sig_set_ex_sigalrm);    
 
             spthread_disable_interrupts_self(); // protection ON  
@@ -202,10 +198,18 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
                 // only suspend and push back to priority queue if the thread status is still RUNNING
                 spthread_suspend(thrd_handle(curr_run_pcb_ptr));                
                 pcb_queue_push(curr_queue_ptr, curr_run_pcb_ptr);    
+
+            } else if ((thrd_status(curr_run_pcb_ptr) == THRD_BLOCKED) && thrd_sleepstamp(curr_run_pcb_ptr) != 0) {                                        
+                if (global_clock - thrd_sleepstamp(curr_run_pcb_ptr) >= thrd_sleeplength(curr_run_pcb_ptr)) {
+                    curr_run_pcb_ptr->status = THRD_RUNNING;
+                    pcb_queue_push(curr_queue_ptr, curr_run_pcb_ptr);                           
+                }       
+
             } else if (thrd_status(curr_run_pcb_ptr) == THRD_REAPED) {
                 pcb_vec_remove_by_pcb(&all_unreaped_pcb_vector, curr_run_pcb_ptr);
                 pcb_destroy(curr_run_pcb_ptr);
             }
+            
             spthread_enable_interrupts_self(); // protection OFF
 
 

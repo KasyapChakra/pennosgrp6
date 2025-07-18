@@ -15,11 +15,6 @@
 #define QUEUE_PICK_PATTERN_LENGTH 19
 extern const int queue_pick_pattern[QUEUE_PICK_PATTERN_LENGTH];
 
-/* total number of clock ticks (each tick = quantum length, default 100 ms) since PennOS boot */
-extern volatile unsigned long g_ticks;
-/* temporary alias until we migrate all call-sites */
-extern volatile sig_atomic_t cumulative_tick_global; // for DEBUG, can be deleted later ////////////////
-
 
 typedef struct scheduler_para_st {
     const int num_queues; // number of priority (running) queues
