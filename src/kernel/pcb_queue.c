@@ -54,7 +54,7 @@ void pcb_queue_push(pcb_queue_t* self_ptr, pcb_t* pcb_ptr) {
 
     spthread_disable_interrupts_self();
     // if already in the queue, do nothing and return
-    if (pcb_in_prio_queue(pcb_ptr, self_ptr)) {
+    if (pcb_in_queue(pcb_ptr, self_ptr)) {
         return;
     }
 

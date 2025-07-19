@@ -95,7 +95,7 @@ void k_register_pcb(pcb_t* pcb_ptr);
 pid_t   k_get_pid(pcb_t* pcb_ptr);
 
 // helpers
-bool pcb_in_prio_queue(pcb_t* self_ptr, pcb_queue_t* queue_ptr);
+bool pcb_in_queue(pcb_t* self_ptr, pcb_queue_t* queue_ptr);
 
 
 // ============================ Process & syscall helpers (new) ============================ //

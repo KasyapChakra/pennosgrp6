@@ -603,7 +603,7 @@ wait
 }
 */
 
-bool pcb_in_prio_queue(pcb_t* self_ptr, pcb_queue_t* queue_ptr) {
+bool pcb_in_queue(pcb_t* self_ptr, pcb_queue_t* queue_ptr) {
   pcb_t* curr_pcb_ptr = queue_head(queue_ptr);
   while (curr_pcb_ptr != NULL) {
     if (curr_pcb_ptr == self_ptr) {
@@ -654,7 +654,7 @@ pid_t k_waitpid(pid_t pid, int* wstatus, bool nohang) {
     spthread_disable_interrupts_self();
     // manage waitpid calling thread status
     self_pcb_ptr->status = THRD_RUNNING;
-    if (!pcb_in_prio_queue(
+    if (!pcb_in_queue(
             self_pcb_ptr, &priority_queue_array[thrd_priority(self_pcb_ptr)])) {
       // waitpid calling thread PCB not in priority queue
       // ==> self suspend

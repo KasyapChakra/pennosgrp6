@@ -91,7 +91,7 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
             // process pcb vec
             for (int i = 0; i < pcb_vec_len(&all_unreaped_pcb_vector); i++) {
                 curr_pcb_ptr = (&all_unreaped_pcb_vector)->pcb_ptr_array[i];
-                if ((thrd_status(curr_pcb_ptr) == THRD_RUNNING) && (!pcb_in_prio_queue(curr_pcb_ptr, &priority_queue_array[thrd_priority(curr_pcb_ptr)]))) { 
+                if ((thrd_status(curr_pcb_ptr) == THRD_RUNNING) && (!pcb_in_queue(curr_pcb_ptr, &priority_queue_array[thrd_priority(curr_pcb_ptr)]))) { 
                     // found a thread that is ready for run but not in its corresponding priority queue
                     // ==> push back to priority queue
                     pcb_queue_push(&priority_queue_array[thrd_priority(curr_pcb_ptr)], curr_pcb_ptr);  
