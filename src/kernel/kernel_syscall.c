@@ -323,9 +323,9 @@ static int set_routine_and_run_helper(pcb_t* proc,
   klog("k_set_routine_and_run_helper: set process name for PID[%d]: %s",
        thrd_pid(proc), proc->command);
 
-  // 3) enqueue into READY queue
-  proc->status = THRD_RUNNING;
+  // 3) enqueue into READY queue    
   spthread_disable_interrupts_self();
+  proc->status = THRD_RUNNING;
   pcb_queue_push(&priority_queue_array[thrd_priority(proc)], proc);
   spthread_enable_interrupts_self();
 

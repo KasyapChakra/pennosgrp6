@@ -111,10 +111,10 @@ void pennos_kernel(void) {
                INIT_THREAD_NAME) == -1) {
     panic("pcb_init() failed!\n");
   }
+  k_register_pcb(temp_pcb_ptr);  // push to pcb vector
   pcb_queue_push(&priority_queue_array[QUEUE_PRIORITY_0],
                  temp_pcb_ptr);  // push to priority queue
-  k_register_pcb(temp_pcb_ptr);  // push to pcb vector
-
+  
   // ------ set up and run scheduler function ------ //
   scheduler_para_t new_scheduler_para = (scheduler_para_t){
       .num_queues = NUM_PRIORITY_QUEUES,
@@ -168,9 +168,11 @@ void* thrd_init_fn([[maybe_unused]] void* arg) {
                pid_count++, SHELL_THREAD_NAME) == -1) {
     panic("pcb_init() failed!\n");
   }
+  spthread_disable_interrupts_self();
+  k_register_pcb(temp_pcb_ptr);  // push to pcb_vec
   pcb_queue_push(&priority_queue_array[QUEUE_PRIORITY_0],
                  temp_pcb_ptr);  // push to priority queue
-  k_register_pcb(temp_pcb_ptr);  // push to pcb_vec
+  spthread_enable_interrupts_self();
 
   ///////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////
@@ -243,6 +245,7 @@ void* thrd_init_fn([[maybe_unused]] void* arg) {
   dprintf(STDERR_FILENO, "~~~~~~~~~~ Init thread exit ~~~~~~~~~~\n");
 
   spthread_exit(NULL);
+
   return NULL;
 }
 

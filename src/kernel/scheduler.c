@@ -107,6 +107,8 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
                 }
                 
                 if (thrd_status(curr_pcb_ptr) == THRD_REAPED) {
+                    // make sure it's not in the priority queue
+                    pcb_queue_pop_by_pid(&priority_queue_array[thrd_priority(curr_pcb_ptr)], thrd_pid(curr_pcb_ptr)); 
                     // remove and destroy reaped thread from pcb vec                    
                     pcb_vec_remove_by_pcb(&all_unreaped_pcb_vector, curr_pcb_ptr);
                     pcb_destroy(curr_pcb_ptr);  
@@ -156,15 +158,16 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
             while (curr_pcb_ptr != NULL) {
                 if (thrd_status(curr_pcb_ptr) == THRD_RUNNING) {
                     curr_run_pcb_ptr = curr_pcb_ptr;
-                    curr_pcb_ptr = thrd_next(curr_pcb_ptr);
+                    //curr_pcb_ptr = thrd_next(curr_pcb_ptr);
+                    break;
                 } else {
                     pcb_t* temp_pcb_ptr = curr_pcb_ptr;
                     curr_pcb_ptr = thrd_next(curr_pcb_ptr);
                     pcb_queue_pop_by_pid(curr_queue_ptr, thrd_pid(temp_pcb_ptr));
-                    if (thrd_status(temp_pcb_ptr) == THRD_REAPED) {
-                        pcb_vec_remove_by_pcb(&all_unreaped_pcb_vector, temp_pcb_ptr);
-                        pcb_destroy(temp_pcb_ptr);
-                    }
+                    //if (thrd_status(temp_pcb_ptr) == THRD_REAPED) {
+                    //    pcb_vec_remove_by_pcb(&all_unreaped_pcb_vector, temp_pcb_ptr);
+                    //    pcb_destroy(temp_pcb_ptr);
+                    //}
                 }
             }
 

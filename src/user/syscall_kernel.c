@@ -54,7 +54,9 @@ pid_t s_spawn(void* (*func)(void*), char* argv[], int fd0, int fd1) {
   assert_non_null(parent, "s_spawn: parent missing");
 
   /* Use parent's priority by default */
-  int priority = parent->priority_level;
+  //int priority = parent->priority_level;
+  // according to project specs, default priority = 1 (except for init and shell)
+  int priority = QUEUE_PRIORITY_1;
   pcb_t* child = k_proc_create(parent, priority);
   if (!child) {
     errno = EAGAIN;
