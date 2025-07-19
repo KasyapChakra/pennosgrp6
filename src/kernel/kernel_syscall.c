@@ -987,7 +987,7 @@ int k_tcsetpid([[maybe_unused]] pid_t pid) {
 }
 
 // ───────────────── scheduling helpers ─────────────────────────────
-
+/*
 int k_nice(pid_t pid, int priority) {
   if (priority < 0 || priority >= NUM_PRIORITY_QUEUES) {
     return -1;
@@ -1019,6 +1019,21 @@ int k_nice(pid_t pid, int priority) {
   pcb_queue_push(&priority_queue_array[priority], pcb_ptr);
   spthread_enable_interrupts_self();
 
+  return 0;
+}
+*/
+
+int k_nice(pid_t pid, int priority) {
+  if (priority < 0 || priority >= NUM_PRIORITY_QUEUES) {
+    return -1;
+  }
+
+  pcb_t* target_pcb_ptr = pcb_vec_seek_pcb_by_pid(&all_unreaped_pcb_vector, pid);
+  if (target_pcb_ptr == NULL) {
+    return -1;
+  }
+
+  target_pcb_ptr->priority_level = priority;
   return 0;
 }
 
