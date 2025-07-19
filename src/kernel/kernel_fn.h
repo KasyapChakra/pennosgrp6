@@ -108,7 +108,7 @@ bool pcb_in_prio_queue(pcb_t* self_ptr, pcb_queue_t* queue_ptr);
 pid_t   k_waitpid(pid_t pid, int* wstatus, bool nohang);
 int     k_kill(pid_t pid, k_signal_t sig);
 int     k_tcsetpid(pid_t pid);
-int     k_nice(pid_t pid, int priority);
+int     k_nice(pid_t pid, int new_priority);
 void    k_sleep(clock_tick_t length_in_second);
 int     k_pipe(int fds[2]);
 

@@ -1023,8 +1023,8 @@ int k_nice(pid_t pid, int priority) {
 }
 */
 
-int k_nice(pid_t pid, int priority) {
-  if (priority < 0 || priority >= NUM_PRIORITY_QUEUES) {
+int k_nice(pid_t pid, int new_priority) {
+  if (new_priority < 0 || new_priority >= NUM_PRIORITY_QUEUES) {
     return -1;
   }
 
@@ -1033,7 +1033,13 @@ int k_nice(pid_t pid, int priority) {
     return -1;
   }
 
-  target_pcb_ptr->priority_level = priority;
+  int old_priority = thrd_priority(target_pcb_ptr);
+
+  target_pcb_ptr->priority_level = new_priority;
+  extern volatile clock_tick_t global_clock;
+  klog("[%5d]\tNICE\t%d\t%d\t%d\tprocess", global_clock, thrd_pid(target_pcb_ptr), old_priority,
+       new_priority);
+
   return 0;
 }
 
