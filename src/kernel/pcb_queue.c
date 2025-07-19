@@ -7,6 +7,7 @@
  * =============================================================== */
 
 #include "./pcb_queue.h"
+#include "./kernel_fn.h"
 
 #include <stdlib.h>
 #include <stdio.h> // for dprintf()
@@ -51,6 +52,12 @@ pcb_t* pcb_queue_pop(pcb_queue_t* self_ptr) {
 void pcb_queue_push(pcb_queue_t* self_ptr, pcb_t* pcb_ptr) {
     // push to the end of the queue
 
+    spthread_disable_interrupts_self();
+    // if already in the queue, do nothing and return
+    if (pcb_in_prio_queue(pcb_ptr, self_ptr)) {
+        return;
+    }
+
     if (queue_is_empty(self_ptr)) {
         self_ptr->q_head_ptr = pcb_ptr; // empty queue ==> update queue head
     } else {
@@ -58,6 +65,7 @@ void pcb_queue_push(pcb_queue_t* self_ptr, pcb_t* pcb_ptr) {
     }
     self_ptr->q_end_ptr = pcb_ptr; // update queue end
     self_ptr->length++;
+    spthread_enable_interrupts_self(); 
     return;
 }
 
