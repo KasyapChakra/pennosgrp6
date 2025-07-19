@@ -195,12 +195,12 @@ void scheduler_fn(scheduler_para_t* arg_ptr) {
             if (thrd_status(curr_run_pcb_ptr) == THRD_RUNNING) {
                 // only suspend and push back to priority queue if the thread status is still RUNNING
                 spthread_suspend(thrd_handle(curr_run_pcb_ptr));                
-                pcb_queue_push(curr_queue_ptr, curr_run_pcb_ptr);    
+                pcb_queue_push(&priority_queue_array[thrd_priority(curr_run_pcb_ptr)] , curr_run_pcb_ptr);                   
 
             } else if ((thrd_status(curr_run_pcb_ptr) == THRD_BLOCKED) && thrd_sleepstamp(curr_run_pcb_ptr) != 0) {                                        
                 if (global_clock - thrd_sleepstamp(curr_run_pcb_ptr) >= thrd_sleeplength(curr_run_pcb_ptr)) {
                     curr_run_pcb_ptr->status = THRD_RUNNING;
-                    pcb_queue_push(curr_queue_ptr, curr_run_pcb_ptr);                           
+                    pcb_queue_push(&priority_queue_array[thrd_priority(curr_run_pcb_ptr)], curr_run_pcb_ptr);                           
                 }       
 
             } else if (thrd_status(curr_run_pcb_ptr) == THRD_REAPED) {
