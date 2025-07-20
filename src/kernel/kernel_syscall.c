@@ -875,11 +875,14 @@ int k_kill(pid_t pid, k_signal_t sig) {
     case P_SIGTERM:
       if (thrd_status(target_pcb_ptr) != THRD_ZOMBIE) {
         spthread_disable_interrupts_self();
+        
+        // More aggressive cancellation approach for stubborn threads
         spthread_cancel(thrd_handle(target_pcb_ptr));
-        // spthread_continue(thrd_handle(target_pcb_ptr)); // this code is
-        // needed acording to the demo
-        // spthread_suspend(thrd_handle(target_pcb_ptr)); // this code is needed
-        // acording to the demo
+        
+        // Force the thread to hit a cancellation point by continuing then suspending
+        spthread_continue(thrd_handle(target_pcb_ptr));
+        spthread_suspend(thrd_handle(target_pcb_ptr));
+        
         target_pcb_ptr->status = THRD_ZOMBIE;
         target_pcb_ptr->term_signal = P_SIGTERM;
         target_pcb_ptr->exit_code = 1;

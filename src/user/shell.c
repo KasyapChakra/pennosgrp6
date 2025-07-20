@@ -2,6 +2,7 @@
 
 #include "shell.h"
 #include <signal.h>
+#include <pthread.h>
 #include "../common/pennos_signal.h"
 #include "../util/parser.h"
 #include "../util/utils.h"
@@ -99,13 +100,25 @@ typedef struct cmd_func_match_t {
 } cmd_func_match_t;
 
 /* ───────────────────────────────────────────────
+ *  built-ins that MUST run inside the shell
+ *  (can modify shell state, job control, etc.)
+ * ───────────────────────────────────────────────*/
+static cmd_func_match_t inline_funcs[] = {{"nice_pid", u_nice_pid},
+                                           {"jobs", jobs_builtin},
+                                           {"bg", bg},
+                                           {"fg", fg},
+                                           {"logout", logout_cmd},
+                                           {"man", man},
+                                           {NULL, NULL}};
+
+/* ───────────────────────────────────────────────
  *  built-ins that MUST run in a *separate* PennOS
  *  process (section 3.1 first table)
  * ───────────────────────────────────────────────*/
 static cmd_func_match_t independent_funcs[] = {
     {"ps", ps},
     {"echo", echo},
-    {"sleep", u_sleep}, /* user types “sleep 10”          */
+    {"sleep", u_sleep}, /* user types "sleep 10"          */
     {"touch", touch},   /* NEW */
     {"ls", ls},         /* NEW */
     {"cat", cat},       /* NEW */
@@ -114,23 +127,11 @@ static cmd_func_match_t independent_funcs[] = {
     {"orphanify", orphanify},
     {"busy", busy},
     {"kill", kill_cmd}, /* renamed                        */
+    {"nice", u_nice},   /* moved from inline_funcs        */
     {"cp", cp},
     {"mv", mv},
     {"rm", rm},
     {NULL, NULL}};
-
-/* ───────────────────────────────────────────────
- *  built-ins that run **inside the shell**
- *  (section 3.1 “sub-routine” table)
- * ───────────────────────────────────────────────*/
-static cmd_func_match_t inline_funcs[] = {{"nice", u_nice},
-                                          {"nice_pid", u_nice_pid},
-                                          {"man", man},
-                                          {"jobs", jobs_builtin},
-                                          {"bg", bg},
-                                          {"fg", fg},
-                                          {"logout", logout_cmd},
-                                          {NULL, NULL}};
 
 /*──────────────────────────────────────────────────────────────*/
 /*          MAIN PROGRAM (existing content remains)             */
@@ -722,19 +723,19 @@ void* u_nice(void* arg) {
     return NULL;
   }
 
-  pid_t child_pid = 0;
-
   thd_func_t func = get_func_from_cmd(argv[2], independent_funcs);
   if (func != NULL) {
     // FOUND INDEPENDENT FUNC COMMAND
     // spawn new process to run the command
-    child_pid = s_spawn(func, argv + 2, 0, 1);
+    pid_t child_pid = s_spawn(func, argv + 2, 0, 1);
     if (child_pid < 0) {
       // spawn failed somehow
       fprintf(stderr, "%s Failed to spawn process for command: %s\n", argv[0],
               argv[2]);
-    } else if (s_nice(child_pid, priority) ==
-               0) {  // SYSTEM CALL TO UPDATE NICE VALUE
+      return NULL;
+    } 
+    
+    if (s_nice(child_pid, priority) == 0) {  // SYSTEM CALL TO UPDATE NICE VALUE
       // update nice value successful
       fprintf(stderr, "Command run as PID[%d] and set to priority %d: %s\n",
               child_pid, priority, argv[2]);
@@ -743,15 +744,13 @@ void* u_nice(void* arg) {
       fprintf(stderr, "Command run as PID[%d] but set priority failed: %s\n",
               child_pid, argv[2]);
     }
+    
+    // Don't wait for the process - let it run independently
+    return NULL;
   } else {
     fprintf(stderr, "Invalid command: %s\n", argv[2]);
     return NULL;
   }
-
-  // RETURN PID
-  pid_t* ret = malloc(sizeof(pid_t));
-  *ret = child_pid;
-  return ret;
 }
 
 /******************************************
@@ -766,8 +765,17 @@ void* zombie_child(void* arg) {
 void* zombify(void* arg) {
   char* args[] = {"zombie_child", NULL};
   s_spawn(zombie_child, args, 0, 1);
-  while (1)
-    ;
+  
+  // Make the infinite loop more responsive to cancellation
+  volatile long counter = 0;
+  while (1) {
+    counter++;
+    // Every 100000 iterations, check for cancellation
+    if (counter % 100000 == 0) {
+      pthread_testcancel();  // This is a cancellation point
+      counter = 0;  // Reset to prevent overflow
+    }
+  }
   return NULL;
 }
 

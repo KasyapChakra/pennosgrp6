@@ -46,7 +46,9 @@ void handler_sigint_shell(int signum) {
     if (fg_pid > 0) {
       // Kill the foreground process
       int result = s_kill(fg_pid, P_SIGTERM);
-      current_fg_pid = -1;  // Reset only after successful kill
+      if (result == 0) {
+        current_fg_pid = -1;  // Reset only after successful kill
+      }
       write_prompt("\n");
       if (result == 0) {
         // Signal sent successfully, let the shell continue normally
@@ -161,7 +163,7 @@ void* thrd_shell_fn([[maybe_unused]] void* arg) {
   sigaddset(&sig_set_shell, SIGTSTP);
   pthread_sigmask(SIG_UNBLOCK, &sig_set_shell, NULL);
 
-  dprintf(STDERR_FILENO, "########### Shell thread started ###########\n");
+  dprintf(STDERR_FILENO, "########### Shell thread started114 ###########\n");
 
   // // Call the main shell function from user/shell.c
   // shell_main(NULL);
